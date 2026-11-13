@@ -563,11 +563,13 @@ namespace FancyWM
             m_gui.EnsureTopmost();
         }
 
+        private Point m_lastPreviewCursor = new Point(-99999, -99999);
+
         private void OnDragTrackingTimerTick(object? sender, EventArgs e)
         {
             if (!m_active || m_movingWindow == null)
             {
-                m_dragTrackingTimer.Stop();
+                StopDragTrackingTimer();
                 return;
             }
 
@@ -576,7 +578,7 @@ namespace FancyWM
             // 实时检测鼠标主按键是否松开（通过直接检测物理按键状态，支持左右手鼠标配置）
             if ((PInvoke.GetAsyncKeyState(1) & 0x8000) == 0 && (PInvoke.GetAsyncKeyState(2) & 0x8000) == 0)
             {
-                m_dragTrackingTimer.Stop();
+                StopDragTrackingTimer();
                 if (m_movingWindow != null)
                 {
                     var win = m_movingWindow;
@@ -584,11 +586,18 @@ namespace FancyWM
                     m_currentInteraction = UserInteraction.None;
                     m_isDraggingTitleBar = false;
                     m_isDraggingSnappedWindow = false;
+                    m_lastPreviewCursor = new Point(-99999, -99999);
                     SetPreviewRectangle(null, null);
                     DoWindowMove(win);
                 }
                 return;
             }
+
+            if (pt == m_lastPreviewCursor)
+            {
+                return;
+            }
+            m_lastPreviewCursor = pt;
 
             UpdateDragPreview(pt);
         }
@@ -1490,7 +1499,8 @@ namespace FancyWM
             if (!m_active)
                 return;
 
-            _ = m_dispatcher.InvokeAsync(() => m_dragTrackingTimer.Stop());
+            StopDragTrackingTimer();
+            m_lastPreviewCursor = new Point(-99999, -99999);
             SetPreviewRectangle(null, null);
 
             var win = m_movingWindow;
@@ -1575,7 +1585,8 @@ namespace FancyWM
                 else
                 {
                     m_currentInteraction = UserInteraction.Resizing;
-                    _ = m_dispatcher.InvokeAsync(() => m_dragTrackingTimer.Stop());
+                    StopDragTrackingTimer();
+                    m_lastPreviewCursor = new Point(-99999, -99999);
                     m_isDraggingTitleBar = false;
                     m_isDraggingSnappedWindow = false;
                     SetPreviewRectangle(null, null);
@@ -1920,7 +1931,7 @@ namespace FancyWM
             m_isDraggingTitleBar = wasSnapped || inTitleBarArea;
             m_currentInteraction = m_isDraggingTitleBar ? UserInteraction.Moving : UserInteraction.Starting;
 
-            _ = m_dispatcher.InvokeAsync(() => m_dragTrackingTimer.Start());
+            StartDragTrackingTimer();
             UpdateDragPreview(cursor);
         }
 

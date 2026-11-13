@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Threading;
+using System.Runtime.InteropServices;
 
 using FancyWM.Layouts.Tiling;
 using FancyWM.Utilities;
@@ -195,6 +196,60 @@ namespace FancyWM
         private readonly Counter m_frozen = new();
         private readonly Stopwatch m_sw = new();
 
+        [DllImport("winmm.dll", EntryPoint = "timeBeginPeriod", SetLastError = true)]
+        private static extern uint TimeBeginPeriod(uint uMilliseconds);
+
+        [DllImport("winmm.dll", EntryPoint = "timeEndPeriod", SetLastError = true)]
+        private static extern uint TimeEndPeriod(uint uMilliseconds);
+
+        private bool m_isHighPrecisionTimerActive = false;
+
+        private void StartDragTrackingTimer()
+        {
+            void DoStart()
+            {
+                if (!m_isHighPrecisionTimerActive)
+                {
+                    _ = TimeBeginPeriod(1);
+                    _ = FancyWM.Utilities.AnimationThread.Compositor.BoostClock(true);
+                    m_isHighPrecisionTimerActive = true;
+                }
+                m_dragTrackingTimer.Start();
+            }
+
+            if (m_dispatcher.CheckAccess())
+            {
+                DoStart();
+            }
+            else
+            {
+                _ = m_dispatcher.InvokeAsync(DoStart);
+            }
+        }
+
+        private void StopDragTrackingTimer()
+        {
+            void DoStop()
+            {
+                m_dragTrackingTimer.Stop();
+                if (m_isHighPrecisionTimerActive)
+                {
+                    m_isHighPrecisionTimerActive = false;
+                    _ = TimeEndPeriod(1);
+                    _ = FancyWM.Utilities.AnimationThread.Compositor.BoostClock(false);
+                }
+            }
+
+            if (m_dispatcher.CheckAccess())
+            {
+                DoStop();
+            }
+            else
+            {
+                _ = m_dispatcher.InvokeAsync(DoStop);
+            }
+        }
+
         public TilingService(IWorkspace workspace, IDisplay display, IAnimationThread animationThread, IObservable<ITilingServiceSettings> settings, bool autoRegisterWindows)
         {
             m_logger.Information("Managing display {Display} (Bounds: {Bounds}, Scale: {Scaling})", display, display.Bounds, display.Scaling);
@@ -203,7 +258,10 @@ namespace FancyWM
             m_animationThread = animationThread;
             m_display = display;
             m_backend = new TilingWorkspace();
-            m_dragTrackingTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(16), DispatcherPriority.Render, OnDragTrackingTimerTick, m_dispatcher)
+
+            int targetHz = Math.Clamp(Math.Max(120, display.RefreshRate), 120, 240);
+            var interval = TimeSpan.FromTicks(TimeSpan.TicksPerSecond / targetHz);
+            m_dragTrackingTimer = new DispatcherTimer(interval, DispatcherPriority.Render, OnDragTrackingTimerTick, m_dispatcher)
             {
                 IsEnabled = false
             };
@@ -595,7 +653,7 @@ namespace FancyWM
             m_logger.Information("No longer managing display {Display}", m_display);
 
             m_active = false;
-            m_dragTrackingTimer.Stop();
+            StopDragTrackingTimer();
             m_subscriptions.Dispose();
 
             PlacementFailed = null;
