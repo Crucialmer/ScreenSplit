@@ -93,6 +93,7 @@ namespace FancyWM
 
         public App(ServiceProvider services)
         {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
             Services = services;
             Logger = services.GetRequiredService<ILogger>();
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;

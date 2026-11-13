@@ -610,8 +610,9 @@ namespace FancyWM
 
                                 if (targetW <= 0 || targetH <= 0 || (targetW >= wa.Width && targetH >= wa.Height))
                                 {
-                                    targetW = (int)(wa.Width * 0.60);
-                                    targetH = (int)(wa.Height * 0.65);
+                                    bool isPortrait = m_currentDragTargetSize.X > 0 && m_currentDragTargetSize.Y > 0 && m_currentDragTargetSize.X < m_currentDragTargetSize.Y;
+                                    targetW = isPortrait ? (int)(wa.Height * 0.45) : (int)(wa.Width * 0.60);
+                                    targetH = isPortrait ? (int)(wa.Height * 0.75) : (int)(wa.Height * 0.65);
                                 }
                                 targetW = Math.Clamp(targetW, 100, (int)(wa.Width * 0.98));
                                 targetH = Math.Clamp(targetH, 80, (int)(wa.Height * 0.98));
@@ -677,8 +678,6 @@ namespace FancyWM
                     var win = m_movingWindow;
                     m_movingWindow = null;
                     m_currentInteraction = UserInteraction.None;
-                    m_isDraggingTitleBar = false;
-                    m_isDraggingSnappedWindow = false;
                     m_lastPreviewCursor = new Point(-99999, -99999);
                     SetPreviewRectangle(null, null);
                     DoWindowMove(win);
@@ -1493,8 +1492,9 @@ namespace FancyWM
                             }
                             else
                             {
-                                int defaultW = (int)(wa.Width * 0.60);
-                                int defaultH = (int)(wa.Height * 0.65);
+                                bool isPortrait = currentPos.Width > 0 && currentPos.Height > 0 && currentPos.Width < currentPos.Height;
+                                int defaultW = isPortrait ? (int)(wa.Height * 0.45) : (int)(wa.Width * 0.60);
+                                int defaultH = isPortrait ? (int)(wa.Height * 0.75) : (int)(wa.Height * 0.65);
                                 m_preSnapRectangles[window] = Rectangle.OffsetAndSize(
                                     wa.Left + (wa.Width - defaultW) / 2,
                                     wa.Top + (wa.Height - defaultH) / 2,
@@ -1546,8 +1546,10 @@ namespace FancyWM
 
             if (!hadPreSnap && m_isDraggingSnappedWindow)
             {
-                int defaultW = (int)(wa.Width * 0.60);
-                int defaultH = (int)(wa.Height * 0.65);
+                var curPos = GetVisibleWindowRectangle(window);
+                bool isPortrait = curPos.Width > 0 && curPos.Height > 0 && curPos.Width < curPos.Height;
+                int defaultW = isPortrait ? (int)(wa.Height * 0.45) : (int)(wa.Width * 0.60);
+                int defaultH = isPortrait ? (int)(wa.Height * 0.75) : (int)(wa.Height * 0.65);
                 preSnapRect = Rectangle.OffsetAndSize(
                     wa.Left + (wa.Width - defaultW) / 2,
                     wa.Top + (wa.Height - defaultH) / 2,
@@ -1565,8 +1567,9 @@ namespace FancyWM
 
                 if (targetW >= wa.Width && targetH >= wa.Height)
                 {
-                    targetW = (int)(wa.Width * 0.60);
-                    targetH = (int)(wa.Height * 0.65);
+                    bool isPortrait = preSnapRect.Width < preSnapRect.Height;
+                    targetW = isPortrait ? (int)(wa.Height * 0.45) : (int)(wa.Width * 0.60);
+                    targetH = isPortrait ? (int)(wa.Height * 0.75) : (int)(wa.Height * 0.65);
                 }
                 targetW = Math.Clamp(targetW, 100, (int)(wa.Width * 0.98));
                 targetH = Math.Clamp(targetH, 80, (int)(wa.Height * 0.98));
@@ -1614,39 +1617,6 @@ namespace FancyWM
             m_movingWindow = null;
             bool wasDraggingSnapped = m_isDraggingSnappedWindow;
             bool wasDraggingTitleBar = m_isDraggingTitleBar;
-            m_isDraggingTitleBar = false;
-            m_isDraggingSnappedWindow = false;
-
-            if (win != null && !wasDraggingSnapped && !wasDraggingTitleBar)
-            {
-                // Double check if size changed between start and end of operation (indicating resize, not move)
-                Rectangle endPos = GetVisibleWindowRectangle(win);
-                bool sizeChanged = false;
-                using (m_preSnapRectanglesLock.EnterScope())
-                {
-                    if (m_activeDragOriginalRect.TryGetValue(win, out var origPos))
-                    {
-                        if (Math.Abs(origPos.Width - endPos.Width) > 5 || Math.Abs(origPos.Height - endPos.Height) > 5)
-                        {
-                            sizeChanged = true;
-                        }
-                    }
-                }
-
-                if (sizeChanged)
-                {
-                    m_currentInteraction = UserInteraction.Resizing;
-                    using (m_preSnapRectanglesLock.EnterScope())
-                    {
-                        m_preSnapRectangles.Remove(win);
-                        m_activeDragOriginalRect.Remove(win);
-                    }
-                    using (m_snappedWindowsLock.EnterScope())
-                    {
-                        m_snappedWindows.Remove(win);
-                    }
-                }
-            }
 
             if (win != null && m_currentInteraction == UserInteraction.Moving)
             {
@@ -1668,7 +1638,15 @@ namespace FancyWM
                 finally
                 {
                     m_currentInteraction = UserInteraction.None;
+                    m_isDraggingTitleBar = false;
+                    m_isDraggingSnappedWindow = false;
                 }
+            }
+            else
+            {
+                m_currentInteraction = UserInteraction.None;
+                m_isDraggingTitleBar = false;
+                m_isDraggingSnappedWindow = false;
             }
 
             m_logger.Information("Window {Window} move ended", e.Source.DebugString());
@@ -2041,8 +2019,9 @@ namespace FancyWM
                 m_isDraggingSnappedWindow = true;
                 if (!hasPreSnap || preSnapRect.Width <= 0 || preSnapRect.Height <= 0)
                 {
-                    int defaultW = (int)(wa.Width * 0.60);
-                    int defaultH = (int)(wa.Height * 0.65);
+                    bool isPortrait = startPos.Width > 0 && startPos.Height > 0 && startPos.Width < startPos.Height;
+                    int defaultW = isPortrait ? (int)(wa.Height * 0.45) : (int)(wa.Width * 0.60);
+                    int defaultH = isPortrait ? (int)(wa.Height * 0.75) : (int)(wa.Height * 0.65);
                     preSnapRect = Rectangle.OffsetAndSize(
                         wa.Left + (wa.Width - defaultW) / 2,
                         wa.Top + (wa.Height - defaultH) / 2,
@@ -2065,9 +2044,9 @@ namespace FancyWM
                 m_currentDragTargetSize = new WinMan.Point(startPos.Width, startPos.Height);
             }
 
-            int topHeaderHeight = Math.Max(35, (int)(startPos.Height * 0.25));
-            bool inTitleBarArea = cursor.Y >= startPos.Top + 5 && cursor.Y <= startPos.Top + topHeaderHeight &&
-                                  cursor.X >= startPos.Left + 15 && cursor.X <= startPos.Right - 15;
+            int topHeaderHeight = Math.Max(40, (int)(startPos.Height * 0.25));
+            bool inTitleBarArea = cursor.Y >= startPos.Top - 15 && cursor.Y <= startPos.Top + topHeaderHeight &&
+                                  cursor.X >= startPos.Left - 10 && cursor.X <= startPos.Right + 10;
             m_isDraggingTitleBar = inTitleBarArea;
             m_currentInteraction = UserInteraction.Starting;
 
