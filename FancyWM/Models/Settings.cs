@@ -38,7 +38,7 @@ namespace FancyWM.Models
 
         public bool ActivateOnCapsLock { get; init; } = false;
 
-        public bool ShowStartupWindow { get; init; } = true;
+        public bool ShowStartupWindow { get; init; } = false;
 
         public bool NotifyVirtualDesktopServiceIncompatibility { get; init; } = true;
 

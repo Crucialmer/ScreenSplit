@@ -14,6 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 using System.Reactive.Linq;
 using System.Diagnostics;
 using FancyWM.DllImports;
+using System.Runtime.InteropServices;
 
 namespace FancyWM
 {
@@ -423,6 +424,39 @@ namespace FancyWM
                 return true;
 
             return false;
+        }
+
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out RECT pvAttribute, int cbAttribute);
+        private const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
+
+        private static Rectangle GetVisibleWindowRectangle(IWindow window)
+        {
+            try
+            {
+                if (DwmGetWindowAttribute(window.Handle, DWMWA_EXTENDED_FRAME_BOUNDS, out RECT frameRc, Marshal.SizeOf<RECT>()) == 0)
+                {
+                    if (frameRc.right > frameRc.left && frameRc.bottom > frameRc.top)
+                    {
+                        return new Rectangle(frameRc.left, frameRc.top, frameRc.right, frameRc.bottom);
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            if (PInvoke.GetWindowRect(new(window.Handle), out RECT win32Rc))
+            {
+                var frame = window.FrameMargins;
+                return new Rectangle(
+                    win32Rc.left + frame.Left,
+                    win32Rc.top + frame.Top,
+                    win32Rc.right - frame.Right,
+                    win32Rc.bottom - frame.Bottom);
+            }
+
+            return window.Position;
         }
 
         private ScreenSnapZone GetSnapZone(Point pt, Rectangle wa)
@@ -1450,7 +1484,7 @@ namespace FancyWM
                         }
                         else if (!m_preSnapRectangles.ContainsKey(window))
                         {
-                            var currentPos = window.Position;
+                            var currentPos = GetVisibleWindowRectangle(window);
                             if (currentPos.Width > 0 && currentPos.Height > 0 &&
                                 (currentPos.Width < wa.Width * 0.95 || currentPos.Height < wa.Height * 0.95) &&
                                 !IsWindowSnapped(window, currentPos, wa))
@@ -1578,22 +1612,15 @@ namespace FancyWM
 
             var win = m_movingWindow;
             m_movingWindow = null;
+            bool wasDraggingSnapped = m_isDraggingSnappedWindow;
+            bool wasDraggingTitleBar = m_isDraggingTitleBar;
             m_isDraggingTitleBar = false;
             m_isDraggingSnappedWindow = false;
 
-            if (win != null)
+            if (win != null && !wasDraggingSnapped && !wasDraggingTitleBar)
             {
                 // Double check if size changed between start and end of operation (indicating resize, not move)
-                Rectangle endPos = default;
-                if (PInvoke.GetWindowRect(new(win.Handle), out RECT win32Rc))
-                {
-                    endPos = new Rectangle(win32Rc.left, win32Rc.top, win32Rc.right, win32Rc.bottom);
-                }
-                if (endPos.Width <= 0 || endPos.Height <= 0)
-                {
-                    endPos = e.NewPosition.Width > 0 ? e.NewPosition : win.Position;
-                }
-
+                Rectangle endPos = GetVisibleWindowRectangle(win);
                 bool sizeChanged = false;
                 using (m_preSnapRectanglesLock.EnterScope())
                 {
@@ -1692,13 +1719,12 @@ namespace FancyWM
 
             if (m_currentInteraction == UserInteraction.Starting || m_currentInteraction == UserInteraction.Moving)
             {
-                if (!isSizePreserved)
+                // Only consider it a manual border resize if not dragging a snapped window and not dragging by title bar
+                if (!m_isDraggingSnappedWindow && !m_isDraggingTitleBar && !isSizePreserved)
                 {
                     m_currentInteraction = UserInteraction.Resizing;
                     StopDragTrackingTimer();
                     m_lastPreviewCursor = new Point(-99999, -99999);
-                    m_isDraggingTitleBar = false;
-                    m_isDraggingSnappedWindow = false;
                     SetPreviewRectangle(null, null);
                     using (m_preSnapRectanglesLock.EnterScope())
                     {
@@ -1984,11 +2010,7 @@ namespace FancyWM
             m_movingWindow = e.Source;
 
             var cursor = m_workspace.CursorLocation;
-            Rectangle startPos = default;
-            if (PInvoke.GetWindowRect(new(e.Source.Handle), out RECT win32Rc))
-            {
-                startPos = new Rectangle(win32Rc.left, win32Rc.top, win32Rc.right, win32Rc.bottom);
-            }
+            Rectangle startPos = GetVisibleWindowRectangle(e.Source);
             if (startPos.Width <= 0 || startPos.Height <= 0)
             {
                 startPos = e.OldPosition.Width > 0 ? e.OldPosition : e.Source.Position;
