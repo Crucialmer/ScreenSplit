@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 [assembly: AssemblyTitle("ScreenSplit")]
-[assembly: AssemblyDescription("Dynamic Tiling Window Manager for Windows")]
+[assembly: AssemblyDescription("ScreenSplit - 纯绿色便携·Windows 边缘智能吸附分屏与多窗口管理器")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Crucialmer")]
 [assembly: AssemblyProduct("ScreenSplit")]
@@ -29,9 +29,9 @@ using System.Runtime.InteropServices;
 //      Build Number
 //      Revision
 //
-[assembly: AssemblyVersion("2.19.1.0")]
-[assembly: AssemblyFileVersion("2.19.1.0")]
-[assembly: AssemblyInformationalVersion("2.19.1")]
+[assembly: AssemblyVersion("1.0.0.0")]
+[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyInformationalVersion("1.0.0")]
 
 // Expose internals to tests
 [assembly: InternalsVisibleTo("FancyWM.Tests")]

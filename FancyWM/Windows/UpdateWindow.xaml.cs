@@ -64,13 +64,13 @@ namespace FancyWM.Windows
                 }
                 else
                 {
-                    m_currentVersion = new Version(2, 19, 1);
+                    m_currentVersion = new Version(1, 0, 0);
                 }
             }
             else
             {
                 m_releaseChecker = new ReleaseChecker();
-                m_currentVersion = new Version(2, 19, 1);
+                m_currentVersion = new Version(1, 0, 0);
             }
 
             try

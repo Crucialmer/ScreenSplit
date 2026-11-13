@@ -64,11 +64,7 @@ namespace FancyWM
         private readonly Subject<Unit> m_focusedWindowLocationChanges = new();
         private readonly ILogger m_logger;
         private IDisplay m_activeDisplay;
-        private bool m_showFocus;
         private bool m_showPreviewFocus;
-        private bool m_autoCollapse;
-        private int m_autoSplitCount;
-        private bool m_delayReposition;
         private IReadOnlyCollection<IWindowMatcher> m_exclusionMatchers = [];
         private readonly IObservable<ITilingServiceSettings> m_settings;
         private readonly object m_syncRoot = new();

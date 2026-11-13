@@ -148,11 +148,21 @@ namespace FancyWM
                 .Take(1)
                 .Do(x =>
                 {
-                    if (x.ShowStartupWindow)
+                    bool shouldShow = !x.HasShownFirstRunPrompt || x.ShowStartupWindow;
+                    if (shouldShow)
                     {
                         Dispatcher.Invoke(() =>
                         {
                             new StartupWindow(new ViewModels.SettingsViewModel(App.Current.AppState.Settings)).Show();
+
+                            if (!x.HasShownFirstRunPrompt)
+                            {
+                                _ = App.Current.AppState.Settings.SaveAsync(s => s with
+                                {
+                                    HasShownFirstRunPrompt = true,
+                                    ShowStartupWindow = false
+                                });
+                            }
                         }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                     }
                 });
@@ -410,7 +420,7 @@ namespace FancyWM
         {
 #if DEBUG
             return true;
-#endif
+#else
             int getBucket(int dayOfYear) => (dayOfYear * 13) % 5;
             try
             {
@@ -422,6 +432,7 @@ namespace FancyWM
             {
                 return true;
             }
+#endif
         }
 
         private void OnWorkspaceUnhandledException(object sender, UnhandledExceptionEventArgs e)

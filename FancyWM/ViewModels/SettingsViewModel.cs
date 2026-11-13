@@ -34,6 +34,7 @@ namespace FancyWM.ViewModels
 
         public bool ActivateOnCapsLock { get => m_activateOnCapsLock; set => SetField(ref m_activateOnCapsLock, value); }
         public bool ShowStartupWindow { get => m_showStartupWindow; set => SetField(ref m_showStartupWindow, value); }
+        public bool HasShownFirstRunPrompt { get => m_hasShownFirstRunPrompt; set => SetField(ref m_hasShownFirstRunPrompt, value); }
         public bool NotifyVirtualDesktopServiceIncompatibility { get => m_notifyVirtualDesktopServiceIncompatibility; set => SetField(ref m_notifyVirtualDesktopServiceIncompatibility, value); }
         public bool AllocateNewPanelSpace { get => m_allocateNewPanelSpace; set => SetField(ref m_allocateNewPanelSpace, value); }
         public bool AutoCollapsePanels { get => m_autoCollapsePanels; set => SetField(ref m_autoCollapsePanels, value); }
@@ -198,6 +199,7 @@ namespace FancyWM.ViewModels
         private bool m_runsAtStartup;
         private bool m_runsAsAdministrator;
         private bool m_showStartupWindow;
+        private bool m_hasShownFirstRunPrompt;
         private bool m_notifyVirtualDesktopServiceIncompatibility;
         private bool m_allocateNewPanelSpace;
         private bool m_autoCollapsePanels;
@@ -206,7 +208,6 @@ namespace FancyWM.ViewModels
         private bool m_autoFloatNewWindows;
         private bool m_customAccentColor;
         private bool m_animateWindowMovement;
-        private bool m_mouseAutoFocus;
         private bool m_modifierMoveWindow;
         private bool m_modifierMoveWindowAutoFocus;
         private Color m_accentColor;
@@ -242,6 +243,7 @@ namespace FancyWM.ViewModels
                     SelectedActivationHotkey = settings.ActivationHotkey;
                     ActivateOnCapsLock = settings.ActivateOnCapsLock;
                     ShowStartupWindow = settings.ShowStartupWindow;
+                    HasShownFirstRunPrompt = settings.HasShownFirstRunPrompt;
                     NotifyVirtualDesktopServiceIncompatibility = settings.NotifyVirtualDesktopServiceIncompatibility;
                     AllocateNewPanelSpace = settings.AllocateNewPanelSpace;
                     AutoCollapsePanels = settings.AutoCollapsePanels;
@@ -368,6 +370,7 @@ namespace FancyWM.ViewModels
                     ActivationHotkey = SelectedActivationHotkey!,
                     ActivateOnCapsLock = ActivateOnCapsLock,
                     ShowStartupWindow = ShowStartupWindow,
+                    HasShownFirstRunPrompt = HasShownFirstRunPrompt,
                     NotifyVirtualDesktopServiceIncompatibility = NotifyVirtualDesktopServiceIncompatibility,
                     AllocateNewPanelSpace = AllocateNewPanelSpace,
                     AutoCollapsePanels = AutoCollapsePanels,

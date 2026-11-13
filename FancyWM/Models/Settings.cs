@@ -40,6 +40,8 @@ namespace FancyWM.Models
 
         public bool ShowStartupWindow { get; init; } = false;
 
+        public bool HasShownFirstRunPrompt { get; init; } = false;
+
         public bool NotifyVirtualDesktopServiceIncompatibility { get; init; } = true;
 
         public bool AllocateNewPanelSpace { get; init; } = true;
