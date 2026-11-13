@@ -11,21 +11,49 @@
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" MaxWidth="1024"/>
         </Grid.ColumnDefinitions>
-        <ui:SimpleStackPanel HorizontalAlignment="Stretch" Orientation="Vertical" Margin="12" Spacing="24">
+        <ui:SimpleStackPanel HorizontalAlignment="Stretch" Orientation="Vertical" Margin="0,0,0,32" Spacing="20">
             <TextBlock Text="{x:Static res:Strings.About_Caption}" Style="{StaticResource TitleTextBlockStyle}" />
-            <TextBlock Text="ScreenSplit" Style="{StaticResource SubtitleTextBlockStyle}" />
-            <Border Style="{DynamicResource SettingsItemStyle}">
-                <StackPanel>
-                    <Image HorizontalAlignment="Left" Width="96" Height="96" Source="/Resources/Icon.ico" />
-                    <TextBlock>
-                    <Run Text="{x:Static res:Strings.About_AppVersion}" /> <Run Text="{Binding AppVersionText, Mode=OneTime}" /> <LineBreak />
-                    <Run Text="{x:Static res:Strings.About_Copyright}" />
-                    </TextBlock>
+            
+            <!-- macOS Style Hero Card -->
+            <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                    BorderThickness="1"
+                    CornerRadius="14"
+                    Padding="28,24"
+                    Margin="0,0,0,4">
+                <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                    <Border Width="72" Height="72" CornerRadius="16" Background="#007AFF" HorizontalAlignment="Center" Margin="0,0,0,16">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.3" Color="#007AFF" />
+                        </Border.Effect>
+                        <Image Source="/Resources/Icon.ico" Width="52" Height="52" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <TextBlock Text="ScreenSplit" FontWeight="Bold" FontSize="22" HorizontalAlignment="Center" Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}" />
+                    <TextBlock Text="版本 2.19.1 · 纯绿色便携分屏工具" FontSize="13" HorizontalAlignment="Center" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,6,0,0" />
+                    <TextBlock Text="Copyright © 2026 Crucialmer. All Rights Reserved." FontSize="11.5" HorizontalAlignment="Center" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,4,0,16" />
+                    
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Style="{StaticResource AccentButtonStyle}" Margin="4,0" Padding="14,6" Cursor="Hand" Click="OnHyperlinkButtonClick" Tag="https://github.com/Crucialmer/ScreenSplit">
+                            <Button.Resources>
+                                <CornerRadius x:Key="ControlCornerRadius">8</CornerRadius>
+                            </Button.Resources>
+                            <StackPanel Orientation="Horizontal">
+                                <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE71B;" FontSize="13" Margin="0,0,8,0" />
+                                <TextBlock Text="GitHub 仓库" FontSize="13" />
+                            </StackPanel>
+                        </Button>
+                        <Button Margin="4,0" Padding="14,6" Cursor="Hand" Click="OnHyperlinkButtonClick" Tag="https://github.com/Crucialmer/ScreenSplit/issues">
+                            <Button.Resources>
+                                <CornerRadius x:Key="ControlCornerRadius">8</CornerRadius>
+                            </Button.Resources>
+                            <StackPanel Orientation="Horizontal">
+                                <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE897;" FontSize="13" Margin="0,0,8,0" />
+                                <TextBlock Text="问题与建议" FontSize="13" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
                 </StackPanel>
             </Border>
-            <TextBlock>
-                <Hyperlink NavigateUri="https://github.com/Crucialmer/ScreenSplit" RequestNavigate="OnHyperlinkRequestNavigate">https://github.com/Crucialmer/ScreenSplit</Hyperlink>
-            </TextBlock>
             <TextBlock Text="{x:Static res:Strings.About_Credits}" Style="{StaticResource SubtitleTextBlockStyle}" />
             <Border Style="{DynamicResource SettingsItemStyle}">
                 <StackPanel Orientation="Vertical">

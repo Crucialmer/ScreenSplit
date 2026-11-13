@@ -16,7 +16,7 @@
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" MaxWidth="1024"/>
         </Grid.ColumnDefinitions>
-        <ui:SimpleStackPanel HorizontalAlignment="Left" Orientation="Vertical" Margin="12" Spacing="4">
+        <ui:SimpleStackPanel HorizontalAlignment="Stretch" Orientation="Vertical" Margin="0,0,0,32" Spacing="4">
             <TextBlock Text="{x:Static res:Strings.Rules_Caption}" Style="{DynamicResource TitleTextBlockStyle}" />
             <TextBlock Margin="0, 20" Text="{x:Static res:Strings.Rules_FloatingWindows}" Style="{DynamicResource SubtitleTextBlockStyle}" />
             <Border Style="{DynamicResource SettingsItemStyle}">

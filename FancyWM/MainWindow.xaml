@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:ui="http://schemas.modernwpf.com/2019"
         mc:Ignorable="d"
         Title="ScreenSplitMainWindow"
         xmlns:res="clr-namespace:FancyWM.Resources"
@@ -12,8 +13,20 @@
         WindowState="Minimized">
     <Window.Resources>
         <ContextMenu x:Key="NotifierContextMenu" Placement="MousePoint">
-            <MenuItem Header="{x:Static res:Strings.Settings}" Click="OnSettingsClick" />
-            <MenuItem Header="{x:Static res:Strings.Quit}" Click="OnExitClick" />
+            <MenuItem Header="ScreenSplit  v2.19.1" IsEnabled="False" FontWeight="SemiBold" />
+            <MenuItem Header="纯绿色便携 · 自定义平铺分屏" IsEnabled="False" FontSize="11" Margin="0,-3,0,0" />
+            <Separator />
+            <MenuItem Header="{x:Static res:Strings.Settings}" Click="OnSettingsClick">
+                <MenuItem.Icon>
+                    <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE713;" FontSize="13" />
+                </MenuItem.Icon>
+            </MenuItem>
+            <Separator />
+            <MenuItem Header="{x:Static res:Strings.Quit}" Click="OnExitClick">
+                <MenuItem.Icon>
+                    <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE7E8;" FontSize="13" Foreground="#FF3B30" />
+                </MenuItem.Icon>
+            </MenuItem>
         </ContextMenu>
     </Window.Resources>
 </Window>

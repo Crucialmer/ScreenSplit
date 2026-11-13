@@ -40,20 +40,25 @@ namespace FancyWM.Utilities
             var panelBarBorder = isDarkTheme ? Color.FromArgb(0x19, 0, 0, 0) : Color.FromArgb(0x19, 255, 255, 255);
             var panelBarButtonText = isDarkTheme ? Colors.Black : Colors.White;
             var panelBarTabText = isDarkTheme ? Colors.White : Colors.Black;
-            var controlBorderRadius = isRounded ? 4 : 0;
-            var overlayBorderRadius = isRounded ? 8 : 0;
+            var controlBorderRadius = isRounded ? 10 : 0;
+            var overlayBorderRadius = isRounded ? 14 : 0;
             var panelBarButtonBackgroundHover = accentLight1;
             var panelBarButtonBackgroundActive = accentDark1;
 
             var css = @$"
 /* Generated file _default.css - ANY CHANGES WILL NOT BE SAVED */
-window:focus, window.preview, panel.preview {{
+window:focus {{
+    border-color: {previewBorderColor.ToCss()};
+    border-width: 2.5px;
+    border-radius: {overlayBorderRadius}px;
+    filter: drop-shadow(0px 0px 8px {previewBorderColor.WithOpacity(0.5).ToCss()});
+}}
+window.preview, panel.preview {{
     border-color: {previewBorderColor.ToCss()};
     border-width: 2px;
     border-radius: {overlayBorderRadius}px;
-}}
-window.preview, panel.preview {{
     background-color: {previewRectangleFill.ToCss()};
+    filter: drop-shadow(0px 2px 8px rgba(0,0,0,0.18));
 }}
 panel-bar {{
     border-color: {panelBarBorder.ToCss()};

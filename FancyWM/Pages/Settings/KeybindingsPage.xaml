@@ -12,7 +12,7 @@
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" MaxWidth="1024"/>
         </Grid.ColumnDefinitions>
-        <ui:SimpleStackPanel Grid.IsSharedSizeScope="True" HorizontalAlignment="Stretch" Orientation="Vertical" Margin="12" Spacing="4">
+        <ui:SimpleStackPanel Grid.IsSharedSizeScope="True" HorizontalAlignment="Stretch" Orientation="Vertical" Margin="0,0,0,32" Spacing="4">
             <TextBlock Text="{x:Static res:Strings.Keybindings_Caption}" Style="{DynamicResource TitleTextBlockStyle}" Margin="0,0,0,20" />
 
             <Border Style="{DynamicResource SettingsItemStyle}">

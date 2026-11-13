@@ -9,110 +9,212 @@
         xmlns:pages="clr-namespace:FancyWM.Pages.Settings"
         xmlns:res="clr-namespace:FancyWM.Resources"
         mc:Ignorable="d"
-        Height="640"
-        Width="800"
-        MinWidth="400"
-        MinHeight="300"
-        FontSize="14"
+        Height="680"
+        Width="920"
+        MinWidth="520"
+        MinHeight="420"
+        WindowStartupLocation="CenterScreen"
+        FontFamily="Segoe UI Variable Text, -apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, Microsoft YaHei UI, sans-serif"
+        FontSize="13.5"
         Title="{x:Static res:Strings.Settings_FancyWM}"
         Background="{DynamicResource SystemControlPageBackgroundAltHighBrush}"
         Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}"
         ui:ThemeManager.IsThemeAware="True"
         Focusable="True">
     <DockPanel>
-        <DockPanel DockPanel.Dock="Left" LastChildFill="False">
-            <ListView
-                x:Name="PagesList"
-                DockPanel.Dock="Top"
-                SelectionMode="Single"
-                SelectedValuePath="Page"
-                SelectedIndex="0"
-                SelectionChanged="PagesList_SelectionChanged">
-                <ListView.ItemsSource>
-                    <collections:ArrayList>
-                        <viewmodels:PageItem Page="{x:Type pages:GeneralPage}">
-                            <viewmodels:PageItem.Header>
-                                <StackPanel Orientation="Horizontal">
-                                    <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE713;" />
-                                    <TextBlock Margin="10" Text="{x:Static res:Strings.General_Caption}" />
-                                </StackPanel>
-                            </viewmodels:PageItem.Header>
-                        </viewmodels:PageItem>
-                        <viewmodels:PageItem Page="{x:Type pages:InterfacePage}">
-                            <viewmodels:PageItem.Header>
-                                <StackPanel Orientation="Horizontal">
-                                    <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE771;" />
-                                    <TextBlock Margin="10" Text="{x:Static res:Strings.Interface_Caption}" />
-                                </StackPanel>
-                            </viewmodels:PageItem.Header>
-                        </viewmodels:PageItem>
-                        <viewmodels:PageItem Page="{x:Type pages:InteractionPage}">
-                            <viewmodels:PageItem.Header>
-                                <StackPanel Orientation="Horizontal">
-                                    <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE7C9;" />
-                                    <TextBlock Margin="10" Text="{x:Static res:Strings.Interaction_Caption}" />
-                                </StackPanel>
-                            </viewmodels:PageItem.Header>
-                        </viewmodels:PageItem>
-                        <viewmodels:PageItem Page="{x:Type pages:KeybindingsPage}">
-                            <viewmodels:PageItem.Header>
-                                <StackPanel Orientation="Horizontal">
-                                    <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xF210;" />
-                                    <TextBlock Margin="10" Text="{x:Static res:Strings.Keybindings_Caption}" />
-                                </StackPanel>
-                            </viewmodels:PageItem.Header>
-                        </viewmodels:PageItem>
-                        <viewmodels:PageItem Page="{x:Type pages:RulesPage}">
-                            <viewmodels:PageItem.Header>
-                                <StackPanel Orientation="Horizontal">
-                                    <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE82D;" />
-                                    <TextBlock Margin="10" Text="{x:Static res:Strings.Rules_Caption}" />
-                                </StackPanel>
-                            </viewmodels:PageItem.Header>
-                        </viewmodels:PageItem>
-                        <viewmodels:PageItem Page="{x:Type pages:AdvancedPage}">
-                            <viewmodels:PageItem.Header>
-                                <StackPanel Orientation="Horizontal">
-                                    <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xF259;" />
-                                    <TextBlock Margin="10" Text="{x:Static res:Strings.Advanced_Caption}" />
-                                </StackPanel>
-                            </viewmodels:PageItem.Header>
-                        </viewmodels:PageItem>
-                        <viewmodels:PageItem Page="{x:Type pages:HelpPage}">
-                            <viewmodels:PageItem.Header>
-                                <StackPanel Orientation="Horizontal">
-                                    <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE897;" />
-                                    <TextBlock Margin="10" Text="{x:Static res:Strings.Help_Caption}" />
-                                </StackPanel>
-                            </viewmodels:PageItem.Header>
-                        </viewmodels:PageItem>
-                        <viewmodels:PageItem Page="{x:Type pages:AboutPage}">
-                            <viewmodels:PageItem.Header>
-                                <StackPanel Orientation="Horizontal">
-                                    <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE946;" />
-                                    <TextBlock Margin="10" Text="{x:Static res:Strings.About_Caption}" />
-                                </StackPanel>
-                            </viewmodels:PageItem.Header>
-                        </viewmodels:PageItem>
-                    </collections:ArrayList>
-                </ListView.ItemsSource>
-                <ListView.ItemTemplate>
-                    <DataTemplate>
-                        <ContentControl Content="{Binding Header}" />
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
-            <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch"  DockPanel.Dock="Bottom">
-                <Button Margin="4" HorizontalAlignment="Stretch" DockPanel.Dock="Bottom" Click="OnQuitButtonClick" TextBlock.Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}">
-                    <StackPanel Orientation="Horizontal">
-                        <ui:FontIcon FontSize="14" FontFamily="Segoe MDL2 Assets" Glyph="&#xE7E8;" Margin="0,0,8,0" />
-                        <TextBlock Text="{x:Static res:Strings.Quit}" />
+        <!-- macOS Style Left Sidebar -->
+        <Border DockPanel.Dock="Left"
+                Width="245"
+                Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                BorderThickness="0,0,1,0">
+            <DockPanel LastChildFill="True">
+                <!-- macOS Sidebar App Identity Header -->
+                <Border DockPanel.Dock="Top" Margin="14,16,14,10" Padding="6,4">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Width="34" Height="34" CornerRadius="8" Background="#007AFF" Margin="0,0,10,0">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="6" ShadowDepth="2" Direction="270" Opacity="0.25" Color="#007AFF" />
+                            </Border.Effect>
+                            <Image Source="/Resources/Icon.ico" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="ScreenSplit" FontWeight="SemiBold" FontSize="15" Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}" />
+                            <TextBlock Text="v2.19.1 · 纯绿色便携" FontSize="11" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,1,0,0" />
+                        </StackPanel>
                     </StackPanel>
-                </Button>
-            </StackPanel>
-        </DockPanel>
+                </Border>
+
+                <!-- Divider -->
+                <Rectangle DockPanel.Dock="Top" Height="1" Fill="{DynamicResource SystemControlForegroundBaseLowBrush}" Margin="14,0,14,8" Opacity="0.4" />
+
+                <!-- Bottom Quit Button -->
+                <Border DockPanel.Dock="Bottom" Padding="12,12" Background="Transparent">
+                    <Button HorizontalAlignment="Stretch" Click="OnQuitButtonClick" Cursor="Hand"
+                            Background="Transparent" BorderThickness="0" Padding="8,8"
+                            HorizontalContentAlignment="Left">
+                        <Button.Resources>
+                            <CornerRadius x:Key="ControlCornerRadius">8</CornerRadius>
+                        </Button.Resources>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border Width="26" Height="26" CornerRadius="6" Background="#FF3B30" Margin="0,0,10,0">
+                                <ui:FontIcon FontSize="12" FontFamily="Segoe MDL2 Assets" Glyph="&#xE7E8;" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="{x:Static res:Strings.Quit}" FontSize="13" FontWeight="Medium" Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </Border>
+
+                <!-- Navigation List with macOS Squircles -->
+                <ListView
+                    x:Name="PagesList"
+                    SelectionMode="Single"
+                    SelectedValuePath="Page"
+                    SelectedIndex="0"
+                    BorderThickness="0"
+                    Background="Transparent"
+                    SelectionChanged="PagesList_SelectionChanged">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem" BasedOn="{StaticResource DefaultListViewItemStyle}">
+                            <Setter Property="Margin" Value="10,2,10,2" />
+                            <Setter Property="Padding" Value="8,6" />
+                            <Setter Property="Cursor" Value="Hand" />
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListViewItem">
+                                        <Border x:Name="ItemBorder"
+                                                CornerRadius="8"
+                                                Background="Transparent"
+                                                Padding="{TemplateBinding Padding}"
+                                                SnapsToDevicePixels="True">
+                                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}" />
+                                            </Trigger>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource SystemControlHighlightListAccentLowBrush}" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemsSource>
+                        <collections:ArrayList>
+                            <!-- General -->
+                            <viewmodels:PageItem Page="{x:Type pages:GeneralPage}">
+                                <viewmodels:PageItem.Header>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Border Width="26" Height="26" CornerRadius="6" Background="#8E8E93" Margin="0,0,10,0">
+                                            <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE713;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <TextBlock Text="{x:Static res:Strings.General_Caption}" FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </viewmodels:PageItem.Header>
+                            </viewmodels:PageItem>
+
+                            <!-- Interface -->
+                            <viewmodels:PageItem Page="{x:Type pages:InterfacePage}">
+                                <viewmodels:PageItem.Header>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Border Width="26" Height="26" CornerRadius="6" Background="#007AFF" Margin="0,0,10,0">
+                                            <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE771;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <TextBlock Text="{x:Static res:Strings.Interface_Caption}" FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </viewmodels:PageItem.Header>
+                            </viewmodels:PageItem>
+
+                            <!-- Interaction -->
+                            <viewmodels:PageItem Page="{x:Type pages:InteractionPage}">
+                                <viewmodels:PageItem.Header>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Border Width="26" Height="26" CornerRadius="6" Background="#AF52DE" Margin="0,0,10,0">
+                                            <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE7C9;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <TextBlock Text="{x:Static res:Strings.Interaction_Caption}" FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </viewmodels:PageItem.Header>
+                            </viewmodels:PageItem>
+
+                            <!-- Keybindings -->
+                            <viewmodels:PageItem Page="{x:Type pages:KeybindingsPage}">
+                                <viewmodels:PageItem.Header>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Border Width="26" Height="26" CornerRadius="6" Background="#34C759" Margin="0,0,10,0">
+                                            <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xF210;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <TextBlock Text="{x:Static res:Strings.Keybindings_Caption}" FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </viewmodels:PageItem.Header>
+                            </viewmodels:PageItem>
+
+                            <!-- Rules -->
+                            <viewmodels:PageItem Page="{x:Type pages:RulesPage}">
+                                <viewmodels:PageItem.Header>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Border Width="26" Height="26" CornerRadius="6" Background="#FF9500" Margin="0,0,10,0">
+                                            <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE82D;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <TextBlock Text="{x:Static res:Strings.Rules_Caption}" FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </viewmodels:PageItem.Header>
+                            </viewmodels:PageItem>
+
+                            <!-- Advanced -->
+                            <viewmodels:PageItem Page="{x:Type pages:AdvancedPage}">
+                                <viewmodels:PageItem.Header>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Border Width="26" Height="26" CornerRadius="6" Background="#5856D6" Margin="0,0,10,0">
+                                            <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xF259;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <TextBlock Text="{x:Static res:Strings.Advanced_Caption}" FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </viewmodels:PageItem.Header>
+                            </viewmodels:PageItem>
+
+                            <!-- Help -->
+                            <viewmodels:PageItem Page="{x:Type pages:HelpPage}">
+                                <viewmodels:PageItem.Header>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Border Width="26" Height="26" CornerRadius="6" Background="#30B0C7" Margin="0,0,10,0">
+                                            <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE897;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <TextBlock Text="{x:Static res:Strings.Help_Caption}" FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </viewmodels:PageItem.Header>
+                            </viewmodels:PageItem>
+
+                            <!-- About -->
+                            <viewmodels:PageItem Page="{x:Type pages:AboutPage}">
+                                <viewmodels:PageItem.Header>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Border Width="26" Height="26" CornerRadius="6" Background="#FF2D55" Margin="0,0,10,0">
+                                            <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE946;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <TextBlock Text="{x:Static res:Strings.About_Caption}" FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </viewmodels:PageItem.Header>
+                            </viewmodels:PageItem>
+                        </collections:ArrayList>
+                    </ListView.ItemsSource>
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <ContentControl Content="{Binding Header}" />
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </DockPanel>
+        </Border>
+
+        <!-- Main Content Area with macOS Breathable Padding -->
         <ScrollViewer CanContentScroll="False" HorizontalScrollBarVisibility="Auto">
-            <Border MinWidth="480" Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=ScrollViewer}}" x:Name="PageContent" />
+            <Border MinWidth="480" Padding="32,24,36,32" Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=ScrollViewer}}" x:Name="PageContent" />
         </ScrollViewer>
     </DockPanel>
 </Window>

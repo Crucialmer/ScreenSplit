@@ -33,6 +33,14 @@ namespace FancyWM.Pages.Settings
         {
             _ = Launcher.LaunchUriAsync(e.Uri);
         }
+
+        private void OnHyperlinkButtonClick(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is string url && Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            {
+                _ = Launcher.LaunchUriAsync(uri);
+            }
+        }
         private void OnSponsorButtonClick(object sender, RoutedEventArgs e)
         {
             App.Sponsor();

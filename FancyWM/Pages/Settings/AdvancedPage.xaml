@@ -13,7 +13,7 @@
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" MaxWidth="1024"/>
         </Grid.ColumnDefinitions>
-        <ui:SimpleStackPanel HorizontalAlignment="Stretch" Orientation="Vertical" Margin="12" Spacing="24">
+        <ui:SimpleStackPanel HorizontalAlignment="Stretch" Orientation="Vertical" Margin="0,0,0,32" Spacing="24">
             <TextBlock Text="{x:Static res:Strings.Advanced_Caption}" Style="{StaticResource TitleTextBlockStyle}" />
             <TextBlock Text="AutoHotkey" Style="{StaticResource SubtitleTextBlockStyle}" />
             <Border Style="{DynamicResource SettingsItemStyle}">
