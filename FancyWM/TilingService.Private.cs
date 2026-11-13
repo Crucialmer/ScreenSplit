@@ -16,6 +16,19 @@ using System.Diagnostics;
 
 namespace FancyWM
 {
+    public enum ScreenSnapZone
+    {
+        None,
+        LeftHalf,
+        RightHalf,
+        TopHalf,
+        BottomHalf,
+        TopLeftQuarter,
+        TopRightQuarter,
+        BottomLeftQuarter,
+        BottomRightQuarter
+    }
+
     internal partial class TilingService
     {
         private void RestoreOriginalLayout()
@@ -305,70 +318,159 @@ namespace FancyWM
             return null;
         }
 
+        private void SetPreviewRectangle(Rectangle? rect)
+        {
+            if (m_dispatcher.CheckAccess())
+            {
+                m_gui.PreviewRectangle = rect;
+            }
+            else
+            {
+                m_dispatcher.InvokeAsync(() => m_gui.PreviewRectangle = rect);
+            }
+        }
+
+        private ScreenSnapZone GetSnapZone(Point pt, Rectangle wa)
+        {
+            int edgeMargin = 25;
+            int cornerSizeX = Math.Max(120, (int)(wa.Width * 0.20));
+            int cornerSizeY = Math.Max(100, (int)(wa.Height * 0.20));
+
+            bool isNearLeft = pt.X <= wa.Left + edgeMargin;
+            bool isNearRight = pt.X >= wa.Right - edgeMargin;
+            bool isNearTop = pt.Y <= wa.Top + edgeMargin;
+            bool isNearBottom = pt.Y >= wa.Bottom - edgeMargin;
+
+            // 1. Top-Left Corner (1/4)
+            if ((isNearLeft && pt.Y <= wa.Top + cornerSizeY) ||
+                (isNearTop && pt.X <= wa.Left + cornerSizeX))
+            {
+                return ScreenSnapZone.TopLeftQuarter;
+            }
+
+            // 2. Top-Right Corner (1/4)
+            if ((isNearRight && pt.Y <= wa.Top + cornerSizeY) ||
+                (isNearTop && pt.X >= wa.Right - cornerSizeX))
+            {
+                return ScreenSnapZone.TopRightQuarter;
+            }
+
+            // 3. Bottom-Left Corner (1/4)
+            if ((isNearLeft && pt.Y >= wa.Bottom - cornerSizeY) ||
+                (isNearBottom && pt.X <= wa.Left + cornerSizeX))
+            {
+                return ScreenSnapZone.BottomLeftQuarter;
+            }
+
+            // 4. Bottom-Right Corner (1/4)
+            if ((isNearRight && pt.Y >= wa.Bottom - cornerSizeY) ||
+                (isNearBottom && pt.X >= wa.Right - cornerSizeX))
+            {
+                return ScreenSnapZone.BottomRightQuarter;
+            }
+
+            // 5. Four Edges (1/2)
+            if (isNearLeft)
+            {
+                return ScreenSnapZone.LeftHalf;
+            }
+            if (isNearRight)
+            {
+                return ScreenSnapZone.RightHalf;
+            }
+            if (isNearTop)
+            {
+                return ScreenSnapZone.TopHalf;
+            }
+            if (isNearBottom)
+            {
+                return ScreenSnapZone.BottomHalf;
+            }
+
+            return ScreenSnapZone.None;
+        }
+
+        private Rectangle? GetSnapRectangle(ScreenSnapZone zone, Rectangle wa)
+        {
+            int halfW = wa.Width / 2;
+            int halfH = wa.Height / 2;
+            int rightW = wa.Width - halfW;
+            int bottomH = wa.Height - halfH;
+
+            return zone switch
+            {
+                ScreenSnapZone.LeftHalf =>
+                    Rectangle.OffsetAndSize(wa.Left, wa.Top, halfW, wa.Height),
+                ScreenSnapZone.RightHalf =>
+                    Rectangle.OffsetAndSize(wa.Left + halfW, wa.Top, rightW, wa.Height),
+                ScreenSnapZone.TopHalf =>
+                    Rectangle.OffsetAndSize(wa.Left, wa.Top, wa.Width, halfH),
+                ScreenSnapZone.BottomHalf =>
+                    Rectangle.OffsetAndSize(wa.Left, wa.Top + halfH, wa.Width, bottomH),
+                ScreenSnapZone.TopLeftQuarter =>
+                    Rectangle.OffsetAndSize(wa.Left, wa.Top, halfW, halfH),
+                ScreenSnapZone.TopRightQuarter =>
+                    Rectangle.OffsetAndSize(wa.Left + halfW, wa.Top, rightW, halfH),
+                ScreenSnapZone.BottomLeftQuarter =>
+                    Rectangle.OffsetAndSize(wa.Left, wa.Top + halfH, halfW, bottomH),
+                ScreenSnapZone.BottomRightQuarter =>
+                    Rectangle.OffsetAndSize(wa.Left + halfW, wa.Top + halfH, rightW, bottomH),
+                _ => null,
+            };
+        }
+
+        private void ApplyWindowSnap(IWindow window, Rectangle targetRect)
+        {
+            try
+            {
+                var frame = window.FrameMargins;
+                var adjustedRect = new Rectangle(
+                    left: targetRect.Left - frame.Left,
+                    top: targetRect.Top - frame.Top,
+                    right: targetRect.Right + frame.Right,
+                    bottom: targetRect.Bottom + frame.Bottom);
+
+                if (window.State != WindowState.Restored)
+                {
+                    window.SetState(WindowState.Restored);
+                }
+                window.SetPosition(adjustedRect);
+            }
+            catch (Exception ex)
+            {
+                m_logger.Warning(ex, "Failed to apply window snap for {Window}", window.DebugString());
+            }
+        }
+
         private Rectangle? GetPreviewRectangle()
         {
-            if (m_currentInteraction == UserInteraction.Moving && m_delayReposition || m_movingPanelNode != null)
+            if (m_currentInteraction == UserInteraction.Moving || m_movingPanelNode != null)
             {
                 try
                 {
-                    var isSwapping = IsSwapModifierPressed();
                     var pt = m_workspace.CursorLocation;
-
-                    if (m_movingPanelNode == null)
+                    if (m_display.Bounds.Contains(pt))
                     {
-                        var window = m_workspace.FocusedWindow;
-                        if (window == null)
+                        var snapZone = GetSnapZone(pt, m_display.WorkArea);
+                        if (snapZone != ScreenSnapZone.None)
                         {
-                            return null;
-                        }
-
-                        using (m_backendLock.EnterScope())
-                        {
-                            // 只有在按住 Shift 键时，才显示分屏吸附预览框
-                            if (!isSwapping)
-                            {
-                                return null;
-                            }
-
-                            if (m_backend.HasWindow(window))
-                            {
-                                return m_backend.MockMoveWindow(window, pt, allowNesting: false).preArrange;
-                            }
-                            else if (CanManage(window, ignoreFloating: true))
-                            {
-                                var targetNode = m_backend.NodeAtPoint(m_workspace.VirtualDesktopManager.CurrentDesktop, pt);
-                                if (targetNode != null)
-                                {
-                                    return targetNode.ComputedRectangle;
-                                }
-                                var tree = m_backend.GetTree(m_workspace.VirtualDesktopManager.CurrentDesktop);
-                                if (tree?.Root != null)
-                                {
-                                    return tree.Root.ComputedRectangle;
-                                }
-                            }
+                            return GetSnapRectangle(snapZone, m_display.WorkArea);
                         }
                     }
-                    else
+
+                    if (m_movingPanelNode != null)
                     {
                         using (m_backendLock.EnterScope())
                         {
-                            var rect = m_backend.MockMoveNode(m_movingPanelNode, pt, allowNesting: !isSwapping).preArrange;
-                            var padding = GetPanelPaddingRect();
-                            var spacing = GetPanelSpacing();
-                            return new Rectangle(
-                                rect.Left - padding.Left - spacing / 2,
-                                rect.Top - padding.Top - spacing / 2,
-                                rect.Right + padding.Right + spacing / 2,
-                                rect.Bottom + padding.Bottom + spacing / 2);
+                            return m_backend.MockMoveNode(m_movingPanelNode, pt, allowNesting: false).preArrange;
                         }
                     }
+
+                    return null;
                 }
-                catch (TilingFailedException)
+                catch
                 {
-                }
-                catch (InvalidWindowReferenceException)
-                {
+                    return null;
                 }
             }
             return null;
@@ -1123,68 +1225,47 @@ namespace FancyWM
 
         private void DoWindowMove(IWindow window)
         {
-            var isSwapping = IsSwapModifierPressed();
             var pt = m_workspace.CursorLocation;
+            var wa = m_display.WorkArea;
+            var snapZone = m_display.Bounds.Contains(pt) ? GetSnapZone(pt, wa) : ScreenSnapZone.None;
+
+            if (snapZone != ScreenSnapZone.None)
+            {
+                var targetRect = GetSnapRectangle(snapZone, wa);
+                if (targetRect.HasValue)
+                {
+                    m_logger.Information("Snapping window {Window} to {Zone} rectangle {Rect}",
+                        window.DebugString(), snapZone, targetRect.Value);
+
+                    using (m_backendLock.EnterScope())
+                    {
+                        if (m_backend.HasWindow(window))
+                        {
+                            m_backend.UnregisterWindow(window);
+                        }
+                    }
+                    using (m_floatingSetLock.EnterScope())
+                    {
+                        m_floatingSet.Add(window);
+                    }
+
+                    ApplyWindowSnap(window, targetRect.Value);
+                    InvalidateLayout();
+                    return;
+                }
+            }
+
+            // 未落在停靠区：拖出分屏后自由浮动
             using (m_backendLock.EnterScope())
             {
                 if (m_backend.HasWindow(window))
                 {
-                    if (isSwapping)
-                    {
-                        // 只有在按住 Shift 键时，才在切分区内调整位置或放入
-                        m_logger.Debug("Window {Window} moved with Shift, repositioning in tiling tree at {Position}", window.DebugString(), pt);
-                        m_backend.MoveWindow(window, pt, allowNesting: false);
-                        m_backend.SetFocus(window);
-                    }
-                    else
-                    {
-                        // 未按 Shift 键拖动：摆脱切分区（恢复为自由浮动窗口）
-                        var node = m_backend.FindWindow(window);
-                        var curPos = window.Position;
-                        var shouldFloat = true;
-                        if (node != null)
-                        {
-                            var tileRect = node.ComputedRectangle;
-                            var dx = Math.Abs(curPos.Left - tileRect.Left);
-                            var dy = Math.Abs(curPos.Top - tileRect.Top);
-                            // 若位移极小（<=8px），视为单纯点击，不脱离分屏
-                            if (dx <= 8 && dy <= 8)
-                            {
-                                shouldFloat = false;
-                            }
-                        }
-
-                        if (shouldFloat)
-                        {
-                            m_logger.Information("Window {Window} moved without Shift, detaching from tiling partition (floating)", window.DebugString());
-                            using (m_floatingSetLock.EnterScope())
-                            {
-                                m_floatingSet.Add(window);
-                            }
-                            m_backend.UnregisterWindow(window);
-                            InvalidateLayout();
-                        }
-                    }
-                }
-                else if (isSwapping && CanManage(window, ignoreFloating: true))
-                {
-                    // 浮动窗口：只有在按住 Shift 键拖动时，才放进切分区中
-                    m_logger.Information("User dragged floating window {Window} with Shift, registering into tiling backend at {Position}", window.DebugString(), pt);
+                    m_logger.Information("Window {Window} moved into free space, detaching from tiling partition (floating)", window.DebugString());
                     using (m_floatingSetLock.EnterScope())
                     {
-                        m_floatingSet.Remove(window);
+                        m_floatingSet.Add(window);
                     }
-                    var newNode = m_backend.RegisterWindow(window, maxTreeWidth: m_autoSplitCount);
-                    newNode.Parent!.Padding = GetPanelPaddingRect();
-                    newNode.Parent!.Spacing = GetPanelSpacing();
-                    try
-                    {
-                        m_backend.MoveWindow(window, pt, allowNesting: false);
-                    }
-                    catch
-                    {
-                    }
-                    m_backend.SetFocus(window);
+                    m_backend.UnregisterWindow(window);
                     InvalidateLayout();
                 }
             }
@@ -1195,7 +1276,9 @@ namespace FancyWM
             if (!m_active)
                 return;
 
-            if (m_currentInteraction == UserInteraction.Moving)
+            SetPreviewRectangle(null);
+
+            if (m_currentInteraction == UserInteraction.Moving || CanManage(e.Source, ignoreFloating: true))
             {
                 try
                 {
@@ -1208,15 +1291,9 @@ namespace FancyWM
                 {
                     PlacementFailed?.Invoke(this, new TilingFailedEventArgs(ex.FailReason, e.Source));
                 }
-            }
-            else if (IsSwapModifierPressed() && CanManage(e.Source, ignoreFloating: true))
-            {
-                try
+                catch (Exception ex)
                 {
-                    DoWindowMove(e.Source);
-                }
-                catch
-                {
+                    m_logger.Warning(ex, "Error handling window move end for {Window}", e.Source.DebugString());
                 }
             }
 
@@ -1259,17 +1336,6 @@ namespace FancyWM
                 }
             }
 
-            using (m_backendLock.EnterScope())
-            {
-                if (!m_backend.HasWindow(e.Source))
-                {
-                    if (!IsSwapModifierPressed())
-                    {
-                        return;
-                    }
-                }
-            }
-
             if (m_currentInteraction == UserInteraction.Starting)
             {
                 if (e.OldPosition.Size == e.NewPosition.Size)
@@ -1291,12 +1357,9 @@ namespace FancyWM
                     return;
                 }
 
-                if (e.NewPosition.Width == e.OldPosition.Width && e.NewPosition.Height == e.OldPosition.Height)
+                if (m_currentInteraction == UserInteraction.Moving)
                 {
-                    if (!m_delayReposition)
-                    {
-                        DoWindowMove(e.Source);
-                    }
+                    SetPreviewRectangle(GetPreviewRectangle());
                 }
                 else
                 {
