@@ -366,3 +366,9 @@ FodyWeavers.xsd
 
 # FancyWM packaging project
 PackageProject/
+
+# Build & Release Artifacts
+dist/
+publish/
+*.zip
+

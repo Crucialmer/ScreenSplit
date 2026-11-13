@@ -77,8 +77,9 @@ namespace FancyWM
                 }
                 catch (Exception)
                 {
-                    var versionInfo = FileVersionInfo.GetVersionInfo(Assembly.GetEntryAssembly()!.Location);
-                    return versionInfo.FileVersion ?? "0.0.0.0";
+                    var path = Environment.ProcessPath ?? Assembly.GetEntryAssembly()?.Location;
+                    var versionInfo = !string.IsNullOrEmpty(path) ? FileVersionInfo.GetVersionInfo(path) : null;
+                    return versionInfo?.FileVersion ?? "2.19.1.0";
                 }
             }
         }

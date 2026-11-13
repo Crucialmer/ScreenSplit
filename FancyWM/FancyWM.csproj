@@ -1,16 +1,17 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <AssemblyName>ScreenSplit</AssemblyName>
+    <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows10.0.18362.0</TargetFramework>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <UseWPF>true</UseWPF>
     <ApplicationIcon>Icon4.ico</ApplicationIcon>
-    <Authors>Vesko Karaganev</Authors>
+    <Authors>Crucialmer</Authors>
     <PackageIcon>Icon.png</PackageIcon>
     <Platforms>AnyCPU;x64;x86</Platforms>
     <StartupObject>FancyWM.Startup</StartupObject>
-    <Version>1.2.0</Version>
+    <Version>2.19.1</Version>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
     <Nullable>enable</Nullable>
@@ -68,7 +69,6 @@
     <PackageReference Include="DesktopBridge.Helpers" Version="1.2.2" />
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf.NetCore" Version="1.0.18" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0" />
-    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.1210.39" />
     <PackageReference Include="Serilog.Sinks.Debug" Version="2.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
     <PackageReference Include="Serilog.Sinks.TextWriter" Version="2.1.0" />
@@ -131,9 +131,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="FancyWM.bat">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Update="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>

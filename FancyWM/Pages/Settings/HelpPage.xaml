@@ -6,20 +6,38 @@
              xmlns:local="clr-namespace:FancyWM.Pages.Settings"
              xmlns:ui="http://schemas.modernwpf.com/2019"
              xmlns:controls="clr-namespace:FancyWM.Controls"
-            xmlns:res="clr-namespace:FancyWM.Resources"
-             xmlns:viewmodels="clr-namespace:FancyWM.ViewModels" xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf" d:DataContext="{d:DesignInstance Type=viewmodels:SettingsViewModel}"
+             xmlns:res="clr-namespace:FancyWM.Resources"
+             xmlns:viewmodels="clr-namespace:FancyWM.ViewModels"
+             d:DataContext="{d:DesignInstance Type=viewmodels:SettingsViewModel}"
              mc:Ignorable="d"
              d:DesignHeight="450" d:DesignWidth="800">
     <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" MaxWidth="1024"/>
-            </Grid.ColumnDefinitions>
-            <DockPanel HorizontalAlignment="Stretch">
-            <TextBlock DockPanel.Dock="Top" Text="{x:Static res:Strings.Help_Caption}" Style="{DynamicResource TitleTextBlockStyle}" Margin="12,12,12,24" />
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" MaxWidth="1024"/>
+        </Grid.ColumnDefinitions>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <ui:SimpleStackPanel Margin="12,12,12,24" Spacing="16">
+                <TextBlock Text="ScreenSplit 便携分屏使用说明" Style="{DynamicResource TitleTextBlockStyle}" />
+                <TextBlock Text="ScreenSplit 是纯绿色、免安装的 Windows 屏幕自定义平铺与分屏软件。所有配置与运行数据均存储于程序根目录下的 Data 文件夹内。" TextWrapping="Wrap" FontSize="14" />
+                
+                <TextBlock Text="快捷键操作指南" Style="{DynamicResource SubtitleTextBlockStyle}" Margin="0,12,0,0" />
+                <Border Style="{DynamicResource SettingsItemStyle}">
+                    <ui:SimpleStackPanel Spacing="8">
+                        <TextBlock Text="• Win + Shift + H : 水平切分当前窗口（左/右分屏）" FontSize="14" />
+                        <TextBlock Text="• Win + Shift + V : 垂直切分当前窗口（上/下分屏）" FontSize="14" />
+                        <TextBlock Text="• Win + Shift + 方向键 : 在已分屏的窗口间切换焦点 / 移动窗口" FontSize="14" />
+                        <TextBlock Text="• Win + Shift + F : 切换当前窗口为浮动模式 / 平铺模式" FontSize="14" />
+                        <TextBlock Text="• 鼠标操作 : 直接拖拽窗口边缘即可实时调整分屏大小与比例" FontSize="14" />
+                    </ui:SimpleStackPanel>
+                </Border>
 
-            <Border>
-                <wv2:WebView2 DefaultBackgroundColor="Transparent" Source="https://github.com/FancyWM/fancywm/wiki/Help-&amp;-Troubleshooting#repository-container-header" />
-            </Border>
-        </DockPanel>
+                <TextBlock Text="数据与配置" Style="{DynamicResource SubtitleTextBlockStyle}" Margin="0,12,0,0" />
+                <Border Style="{DynamicResource SettingsItemStyle}">
+                    <ui:SimpleStackPanel Spacing="8">
+                        <TextBlock Text="所有产生的配置文件（settings.json）与运行日志全部保存在软件根目录的 Data 文件夹中，支持随身携带、换机即用。" FontSize="14" TextWrapping="Wrap" />
+                    </ui:SimpleStackPanel>
+                </Border>
+            </ui:SimpleStackPanel>
+        </ScrollViewer>
     </Grid>
 </UserControl>

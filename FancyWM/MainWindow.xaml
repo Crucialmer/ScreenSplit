@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="FancyWMMainWindow"
+        Title="ScreenSplitMainWindow"
         xmlns:res="clr-namespace:FancyWM.Resources"
         WindowStyle="None"
         Focusable="True"
@@ -13,8 +13,6 @@
     <Window.Resources>
         <ContextMenu x:Key="NotifierContextMenu" Placement="MousePoint">
             <MenuItem Header="{x:Static res:Strings.Settings}" Click="OnSettingsClick" />
-            <MenuItem Header="Sponsor ❤️" Click="OnSponsorClick" />
-            <MenuItem Header="{x:Static res:Strings.About_Caption}" Click="OnAboutClick" />
             <MenuItem Header="{x:Static res:Strings.Quit}" Click="OnExitClick" />
         </ContextMenu>
     </Window.Resources>

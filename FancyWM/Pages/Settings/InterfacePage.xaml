@@ -79,14 +79,14 @@
                 </StackPanel>
             </Border>
 
-            <Border Style="{DynamicResource SettingsItemStyle}">
+            <Border Style="{DynamicResource SettingsItemStyle}" Visibility="Collapsed">
                 <StackPanel Orientation="Horizontal">
                     <Slider
                         x:Name="PanelHeightSlider"
                         ui:ControlHelper.Header="{x:Static res:Strings.Interface_PanelHeight}"
                         HorizontalAlignment="Left"
                         Maximum="32"
-                        Minimum="16"
+                        Minimum="0"
                         IsSnapToTickEnabled="True"
                         TickFrequency="2"
                         Value="{Binding PanelHeight, Mode=TwoWay}"
@@ -99,14 +99,14 @@
                 </StackPanel>
             </Border>
 
-            <Border Style="{DynamicResource SettingsItemStyle}">
+            <Border Style="{DynamicResource SettingsItemStyle}" Visibility="Collapsed">
                 <StackPanel Orientation="Horizontal">
                     <Slider
                         x:Name="PanelFontSizeSlider"
                         ui:ControlHelper.Header="{x:Static res:Strings.Interface_PanelFontSize}"
                         HorizontalAlignment="Left"
-                        Maximum="{Binding PanelHeight, Mode=OneWay}"
-                        Minimum="10"
+                        Maximum="24"
+                        Minimum="0"
                         IsSnapToTickEnabled="True"
                         TickFrequency="2"
                         Value="{Binding PanelFontSize, Mode=TwoWay}"

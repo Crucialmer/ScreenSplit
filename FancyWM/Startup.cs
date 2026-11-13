@@ -32,7 +32,7 @@ namespace FancyWM
 
         private static event Action? ProgramExit;
 
-        private const string LogFile = "fancywm.log";
+        private const string LogFile = "screensplit.log";
 
         private static bool IsPackaged
         {
@@ -100,9 +100,9 @@ Type 'FancyWM --help' from anywhere after installation.
 
         private static int AppMain(string[] args)
         {
-            // Set the working path
-            string roamingPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            string fullPath = $"{roamingPath}\\FancyWM";
+            // Set the working path (Portable Mode: data stored inside application directory)
+            string appDir = AppContext.BaseDirectory;
+            string fullPath = Path.Combine(appDir, "Data");
             if (!Directory.Exists(fullPath))
             {
                 Directory.CreateDirectory(fullPath);
@@ -238,7 +238,7 @@ Type 'FancyWM --help' from anywhere after installation.
         {
             if (Application.Current is App app && app.RestartOnClose)
             {
-                var startupCommand = IsPackaged ? $"fancywm" : Assembly.GetEntryAssembly()?.Location.Replace(".dll", ".exe");
+                var startupCommand = Environment.ProcessPath ?? (IsPackaged ? $"screensplit" : Assembly.GetEntryAssembly()?.Location.Replace(".dll", ".exe"));
                 if (startupCommand == null)
                 {
                     return;
@@ -246,7 +246,7 @@ Type 'FancyWM --help' from anywhere after installation.
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = "cmd.exe",
-                    Arguments = $"/c timeout 1 && taskkill /f /im fancywm.exe && timeout 1 && {startupCommand}",
+                    Arguments = $"/c timeout 1 && taskkill /f /im {Process.GetCurrentProcess().ProcessName}.exe && timeout 1 && \"{startupCommand}\"",
                     UseShellExecute = false,
                     CreateNoWindow = true,
                 });
@@ -314,7 +314,7 @@ Type 'FancyWM --help' from anywhere after installation.
                 if (!isUsingTempLogFile)
                 {
                     // Create the file with a placeholder error message indicating more severe failure
-                    var crashFileName = $"fancywm-crash-{DateTimeOffset.Now:yyyyMMddTHHmmss}.log";
+                    var crashFileName = $"screensplit-crash-{DateTimeOffset.Now:yyyyMMddTHHmmss}.log";
                     File.Copy(logFileName, crashFileName, true);
                 }
             };
@@ -325,12 +325,17 @@ Type 'FancyWM --help' from anywhere after installation.
             };
         }
 
-        private static string GetFullVersionString() => $"FancyWM v{GetVersionString()} (https://www.microsoft.com/store/apps/9P1741LKHQS9) on {Environment.OSVersion}";
+        private static string GetFullVersionString() => $"ScreenSplit v{GetVersionString()} on {Environment.OSVersion}";
 
         private static string GetVersionString()
         {
-            var versionInfo = FileVersionInfo.GetVersionInfo(System.Reflection.Assembly.GetEntryAssembly()!.Location);
-            return versionInfo.FileVersion ?? "0.0.0.0";
+            var path = Environment.ProcessPath ?? System.Reflection.Assembly.GetEntryAssembly()?.Location;
+            if (!string.IsNullOrEmpty(path))
+            {
+                var versionInfo = FileVersionInfo.GetVersionInfo(path);
+                return versionInfo.FileVersion ?? "2.19.1.0";
+            }
+            return "2.19.1.0";
         }
 
         private static bool IsAdministrator()
@@ -341,7 +346,7 @@ Type 'FancyWM --help' from anywhere after installation.
 
         private static void SendMessage(string message)
         {
-            var hwnd = PInvoke.FindWindow(null, "FancyWMMainWindow").Value;
+            var hwnd = PInvoke.FindWindow(null, "ScreenSplitMainWindow").Value;
             if (hwnd == IntPtr.Zero)
             {
                 throw new InvalidOperationException("FancyWM is not running!");

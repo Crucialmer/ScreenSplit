@@ -1732,8 +1732,7 @@ namespace FancyWM
 
         private Rectangle GetPanelPaddingRect()
         {
-            double scaling = m_display.Scaling;
-            return new Rectangle(0, (int)((m_panelHeight + m_windowPadding) * scaling), 0, 0);
+            return new Rectangle(0, 0, 0, 0);
         }
 
         private static System.Windows.Thickness ToThickness(Rectangle rc)

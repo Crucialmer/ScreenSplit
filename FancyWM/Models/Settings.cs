@@ -59,7 +59,7 @@ namespace FancyWM.Models
 
         public int WindowPadding { get; init; } = 4;
 
-        public int PanelHeight { get; init; } = 18;
+        public int PanelHeight { get; init; } = 0;
 
         public int PanelFontSize { get; init; } = 12;
 
@@ -86,7 +86,7 @@ namespace FancyWM.Models
             "RAIL_WINDOW",
         ];
 
-        public bool RemindToRateReview { get; init; } = true;
+        public bool RemindToRateReview { get; init; } = false;
 
         public bool ShowContextHints { get; init; } = true;
 
@@ -94,6 +94,6 @@ namespace FancyWM.Models
 
         public bool SoundOnFailure { get; init; } = true;
 
-        public bool CheckForUpdates { get; init; } = true;
+        public bool CheckForUpdates { get; init; } = false;
     }
 }

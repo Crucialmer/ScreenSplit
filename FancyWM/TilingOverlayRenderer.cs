@@ -97,7 +97,7 @@ namespace FancyWM
         private readonly CompositeDisposable m_disposables = new();
         private bool m_isOverlayInit = false;
         private readonly TilingOverlayViewModel m_viewModel = new();
-        private double m_panelHeight = 22.0;
+        private double m_panelHeight = 0.0;
         private double m_windowPadding = 4.0;
         private int m_panelFontSize = 12;
         private IReadOnlyCollection<TilingNode> m_previousSnapshot = [];

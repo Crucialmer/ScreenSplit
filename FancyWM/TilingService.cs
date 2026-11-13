@@ -172,7 +172,7 @@ namespace FancyWM
 
         private readonly CompositeDisposable m_subscriptions = [];
         private readonly IAnimationThread m_animationThread;
-        private int m_panelHeight = 20;
+        private int m_panelHeight = 0;
         private int m_windowPadding = 2;
         private bool m_showFocus = false;
         private bool m_showPreviewFocus = false;
