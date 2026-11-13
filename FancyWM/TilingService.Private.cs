@@ -338,29 +338,88 @@ namespace FancyWM
             }
         }
 
-        private static bool IsWindowSnapped(Rectangle pos, Rectangle wa)
+        private bool IsWindowSnapped(IWindow window, Rectangle pos, Rectangle wa)
+        {
+            using (m_snappedWindowsLock.EnterScope())
+            {
+                if (m_snappedWindows.Contains(window))
+                    return true;
+            }
+            return IsWindowSnappedGeometry(pos, wa);
+        }
+
+        private static bool IsWindowSnappedGeometry(Rectangle pos, Rectangle wa)
         {
             if (pos.Width <= 0 || pos.Height <= 0) return false;
 
-            bool isHalfWidth = Math.Abs(pos.Width - wa.Width / 2) < 30;
-            bool isFullWidth = Math.Abs(pos.Width - wa.Width) < 30;
-            bool isHalfHeight = Math.Abs(pos.Height - wa.Height / 2) < 30;
-            bool isFullHeight = Math.Abs(pos.Height - wa.Height) < 30;
+            int halfW = wa.Width / 2;
+            int halfH = wa.Height / 2;
+            int rightW = wa.Width - halfW;
+            int bottomH = wa.Height - halfH;
 
-            if ((isHalfWidth && isFullHeight) || (isFullWidth && isHalfHeight))
+            int tol = 35; // Tolerance for window borders, shadows and DPI scaling
+
+            // Left Half
+            if (Math.Abs(pos.Left - wa.Left) <= tol &&
+                Math.Abs(pos.Top - wa.Top) <= tol &&
+                Math.Abs(pos.Width - halfW) <= tol &&
+                Math.Abs(pos.Height - wa.Height) <= tol)
                 return true;
 
-            if (isHalfWidth && isHalfHeight)
+            // Right Half
+            if (Math.Abs(pos.Right - wa.Right) <= tol &&
+                Math.Abs(pos.Top - wa.Top) <= tol &&
+                Math.Abs(pos.Width - rightW) <= tol &&
+                Math.Abs(pos.Height - wa.Height) <= tol)
                 return true;
 
-            bool isNearLeft = Math.Abs(pos.Left - wa.Left) < 20;
-            bool isNearRight = Math.Abs(pos.Right - wa.Right) < 20;
-            bool isNearTop = Math.Abs(pos.Top - wa.Top) < 20;
-            bool isNearBottom = Math.Abs(pos.Bottom - wa.Bottom) < 20;
-
-            if ((isNearLeft || isNearRight) && (pos.Width <= wa.Width * 0.55 || isFullHeight))
+            // Top Half
+            if (Math.Abs(pos.Left - wa.Left) <= tol &&
+                Math.Abs(pos.Top - wa.Top) <= tol &&
+                Math.Abs(pos.Width - wa.Width) <= tol &&
+                Math.Abs(pos.Height - halfH) <= tol)
                 return true;
-            if ((isNearTop || isNearBottom) && (pos.Height <= wa.Height * 0.55 || isFullWidth))
+
+            // Bottom Half
+            if (Math.Abs(pos.Left - wa.Left) <= tol &&
+                Math.Abs(pos.Bottom - wa.Bottom) <= tol &&
+                Math.Abs(pos.Width - wa.Width) <= tol &&
+                Math.Abs(pos.Height - bottomH) <= tol)
+                return true;
+
+            // Maximized
+            if (Math.Abs(pos.Left - wa.Left) <= tol &&
+                Math.Abs(pos.Top - wa.Top) <= tol &&
+                Math.Abs(pos.Width - wa.Width) <= tol &&
+                Math.Abs(pos.Height - wa.Height) <= tol)
+                return true;
+
+            // Top-Left Quarter
+            if (Math.Abs(pos.Left - wa.Left) <= tol &&
+                Math.Abs(pos.Top - wa.Top) <= tol &&
+                Math.Abs(pos.Width - halfW) <= tol &&
+                Math.Abs(pos.Height - halfH) <= tol)
+                return true;
+
+            // Top-Right Quarter
+            if (Math.Abs(pos.Right - wa.Right) <= tol &&
+                Math.Abs(pos.Top - wa.Top) <= tol &&
+                Math.Abs(pos.Width - rightW) <= tol &&
+                Math.Abs(pos.Height - halfH) <= tol)
+                return true;
+
+            // Bottom-Left Quarter
+            if (Math.Abs(pos.Left - wa.Left) <= tol &&
+                Math.Abs(pos.Bottom - wa.Bottom) <= tol &&
+                Math.Abs(pos.Width - halfW) <= tol &&
+                Math.Abs(pos.Height - bottomH) <= tol)
+                return true;
+
+            // Bottom-Right Quarter
+            if (Math.Abs(pos.Right - wa.Right) <= tol &&
+                Math.Abs(pos.Bottom - wa.Bottom) <= tol &&
+                Math.Abs(pos.Width - rightW) <= tol &&
+                Math.Abs(pos.Height - bottomH) <= tol)
                 return true;
 
             return false;
@@ -520,8 +579,8 @@ namespace FancyWM
                                     targetW = (int)(wa.Width * 0.60);
                                     targetH = (int)(wa.Height * 0.65);
                                 }
-                                targetW = Math.Clamp(targetW, 400, (int)(wa.Width * 0.95));
-                                targetH = Math.Clamp(targetH, 300, (int)(wa.Height * 0.95));
+                                targetW = Math.Clamp(targetW, 100, (int)(wa.Width * 0.98));
+                                targetH = Math.Clamp(targetH, 80, (int)(wa.Height * 0.98));
 
                                 int targetX = pt.X - (int)(targetW * m_dragGrabRatioX);
                                 int targetY = pt.Y - 20;
@@ -1336,6 +1395,10 @@ namespace FancyWM
                 m_preSnapRectangles.Remove(e.Source);
                 m_activeDragOriginalRect.Remove(e.Source);
             }
+            using (m_snappedWindowsLock.EnterScope())
+            {
+                m_snappedWindows.Remove(e.Source);
+            }
             using (m_ignoreRepositionSetLock.EnterScope())
             {
                 m_ignoreRepositionSet.Remove(e.Source);
@@ -1390,7 +1453,7 @@ namespace FancyWM
                             var currentPos = window.Position;
                             if (currentPos.Width > 0 && currentPos.Height > 0 &&
                                 (currentPos.Width < wa.Width * 0.95 || currentPos.Height < wa.Height * 0.95) &&
-                                !IsWindowSnapped(currentPos, wa))
+                                !IsWindowSnapped(window, currentPos, wa))
                             {
                                 m_preSnapRectangles[window] = currentPos;
                             }
@@ -1404,6 +1467,11 @@ namespace FancyWM
                                     defaultW, defaultH);
                             }
                         }
+                    }
+
+                    using (m_snappedWindowsLock.EnterScope())
+                    {
+                        m_snappedWindows.Add(window);
                     }
 
                     using (m_backendLock.EnterScope())
@@ -1437,6 +1505,11 @@ namespace FancyWM
                 m_activeDragOriginalRect.Remove(window);
             }
 
+            using (m_snappedWindowsLock.EnterScope())
+            {
+                m_snappedWindows.Remove(window);
+            }
+
             if (!hadPreSnap && m_isDraggingSnappedWindow)
             {
                 int defaultW = (int)(wa.Width * 0.60);
@@ -1461,8 +1534,8 @@ namespace FancyWM
                     targetW = (int)(wa.Width * 0.60);
                     targetH = (int)(wa.Height * 0.65);
                 }
-                targetW = Math.Clamp(targetW, 400, (int)(wa.Width * 0.95));
-                targetH = Math.Clamp(targetH, 300, (int)(wa.Height * 0.95));
+                targetW = Math.Clamp(targetW, 100, (int)(wa.Width * 0.98));
+                targetH = Math.Clamp(targetH, 80, (int)(wa.Height * 0.98));
 
                 int targetX = pt.X - (int)(targetW * m_dragGrabRatioX);
                 int targetY = pt.Y - 20;
@@ -1508,7 +1581,47 @@ namespace FancyWM
             m_isDraggingTitleBar = false;
             m_isDraggingSnappedWindow = false;
 
-            if (win != null && (m_currentInteraction == UserInteraction.Moving || CanManage(win, ignoreFloating: true)))
+            if (win != null)
+            {
+                // Double check if size changed between start and end of operation (indicating resize, not move)
+                Rectangle endPos = default;
+                if (PInvoke.GetWindowRect(new(win.Handle), out RECT win32Rc))
+                {
+                    endPos = new Rectangle(win32Rc.left, win32Rc.top, win32Rc.right, win32Rc.bottom);
+                }
+                if (endPos.Width <= 0 || endPos.Height <= 0)
+                {
+                    endPos = e.NewPosition.Width > 0 ? e.NewPosition : win.Position;
+                }
+
+                bool sizeChanged = false;
+                using (m_preSnapRectanglesLock.EnterScope())
+                {
+                    if (m_activeDragOriginalRect.TryGetValue(win, out var origPos))
+                    {
+                        if (Math.Abs(origPos.Width - endPos.Width) > 5 || Math.Abs(origPos.Height - endPos.Height) > 5)
+                        {
+                            sizeChanged = true;
+                        }
+                    }
+                }
+
+                if (sizeChanged)
+                {
+                    m_currentInteraction = UserInteraction.Resizing;
+                    using (m_preSnapRectanglesLock.EnterScope())
+                    {
+                        m_preSnapRectangles.Remove(win);
+                        m_activeDragOriginalRect.Remove(win);
+                    }
+                    using (m_snappedWindowsLock.EnterScope())
+                    {
+                        m_snappedWindows.Remove(win);
+                    }
+                }
+            }
+
+            if (win != null && m_currentInteraction == UserInteraction.Moving)
             {
                 try
                 {
@@ -1574,15 +1687,12 @@ namespace FancyWM
                 }
             }
 
-            if (m_currentInteraction == UserInteraction.Starting)
+            bool isSizePreserved = Math.Abs(e.OldPosition.Width - e.NewPosition.Width) <= 5 &&
+                                   Math.Abs(e.OldPosition.Height - e.NewPosition.Height) <= 5;
+
+            if (m_currentInteraction == UserInteraction.Starting || m_currentInteraction == UserInteraction.Moving)
             {
-                bool isSizePreserved = Math.Abs(e.OldPosition.Width - e.NewPosition.Width) <= 5 &&
-                                       Math.Abs(e.OldPosition.Height - e.NewPosition.Height) <= 5;
-                if (isSizePreserved || m_isDraggingTitleBar)
-                {
-                    m_currentInteraction = UserInteraction.Moving;
-                }
-                else
+                if (!isSizePreserved)
                 {
                     m_currentInteraction = UserInteraction.Resizing;
                     StopDragTrackingTimer();
@@ -1595,6 +1705,14 @@ namespace FancyWM
                         m_preSnapRectangles.Remove(e.Source);
                         m_activeDragOriginalRect.Remove(e.Source);
                     }
+                    using (m_snappedWindowsLock.EnterScope())
+                    {
+                        m_snappedWindows.Remove(e.Source);
+                    }
+                }
+                else
+                {
+                    m_currentInteraction = UserInteraction.Moving;
                 }
             }
 
@@ -1887,7 +2005,7 @@ namespace FancyWM
             }
 
             var wa = m_display.WorkArea;
-            bool wasSnapped = IsWindowSnapped(startPos, wa);
+            bool wasSnapped = IsWindowSnapped(e.Source, startPos, wa);
             Rectangle preSnapRect = default;
             bool hasPreSnap = false;
 
@@ -1925,11 +2043,11 @@ namespace FancyWM
                 m_currentDragTargetSize = new WinMan.Point(startPos.Width, startPos.Height);
             }
 
-            int topHeaderHeight = Math.Max(100, (int)(startPos.Height * 0.35));
-            bool inTitleBarArea = cursor.Y >= startPos.Top - 25 && cursor.Y <= startPos.Top + topHeaderHeight &&
-                                  cursor.X >= startPos.Left - 15 && cursor.X <= startPos.Right + 15;
-            m_isDraggingTitleBar = wasSnapped || inTitleBarArea;
-            m_currentInteraction = m_isDraggingTitleBar ? UserInteraction.Moving : UserInteraction.Starting;
+            int topHeaderHeight = Math.Max(35, (int)(startPos.Height * 0.25));
+            bool inTitleBarArea = cursor.Y >= startPos.Top + 5 && cursor.Y <= startPos.Top + topHeaderHeight &&
+                                  cursor.X >= startPos.Left + 15 && cursor.X <= startPos.Right - 15;
+            m_isDraggingTitleBar = inTitleBarArea;
+            m_currentInteraction = UserInteraction.Starting;
 
             StartDragTrackingTimer();
             UpdateDragPreview(cursor);
