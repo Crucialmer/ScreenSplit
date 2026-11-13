@@ -559,6 +559,7 @@ namespace FancyWM
         private void UpdateDragPreview(Point pt)
         {
             var preview = GetPreviewInfo(pt);
+            m_logger.Information("[Drag] Preview Rect={Rect}, Title={Title}", preview.Rect, preview.Title);
             SetPreviewRectangle(preview.Rect, preview.Title);
             m_gui.EnsureTopmost();
         }
@@ -573,8 +574,8 @@ namespace FancyWM
 
             var pt = m_workspace.CursorLocation;
 
-            // 实时检测鼠标左键是否松开（通过直接检测物理按键状态）
-            if ((PInvoke.GetAsyncKeyState(1) & 0x8000) == 0)
+            // 实时检测鼠标主按键是否松开（通过直接检测物理按键状态，支持左右手鼠标配置）
+            if ((PInvoke.GetAsyncKeyState(1) & 0x8000) == 0 && (PInvoke.GetAsyncKeyState(2) & 0x8000) == 0)
             {
                 m_dragTrackingTimer.Stop();
                 if (m_movingWindow != null)
@@ -1486,14 +1487,14 @@ namespace FancyWM
             if (!m_active)
                 return;
 
-            m_dragTrackingTimer.Stop();
+            _ = m_dispatcher.InvokeAsync(() => m_dragTrackingTimer.Stop());
             SetPreviewRectangle(null, null);
 
-            var win = m_movingWindow ?? e.Source;
+            var win = m_movingWindow;
             m_movingWindow = null;
             m_isDraggingTitleBar = false;
 
-            if (m_currentInteraction == UserInteraction.Moving || CanManage(win, ignoreFloating: true))
+            if (win != null && (m_currentInteraction == UserInteraction.Moving || CanManage(win, ignoreFloating: true)))
             {
                 try
                 {
@@ -1570,7 +1571,7 @@ namespace FancyWM
                 else
                 {
                     m_currentInteraction = UserInteraction.Resizing;
-                    m_dragTrackingTimer.Stop();
+                    _ = m_dispatcher.InvokeAsync(() => m_dragTrackingTimer.Stop());
                     SetPreviewRectangle(null, null);
                     using (m_preSnapRectanglesLock.EnterScope())
                     {
@@ -1849,6 +1850,7 @@ namespace FancyWM
 
             var cursor = m_workspace.CursorLocation;
             var startPos = e.OldPosition.Width > 0 ? e.OldPosition : e.Source.Position;
+            m_logger.Information("[Drag] PositionChangeStart on {Window}, Pos={Pos}, Cursor={Cursor}", e.Source.DebugString(), startPos, cursor);
             if (startPos.Width > 0)
             {
                 m_dragGrabRatioX = Math.Clamp((cursor.X - startPos.Left) / (double)startPos.Width, 0.1, 0.9);
@@ -1902,7 +1904,7 @@ namespace FancyWM
             m_isDraggingTitleBar = wasSnapped || inTitleBarArea;
             m_currentInteraction = m_isDraggingTitleBar ? UserInteraction.Moving : UserInteraction.Starting;
 
-            m_dragTrackingTimer.Start();
+            _ = m_dispatcher.InvokeAsync(() => m_dragTrackingTimer.Start());
             UpdateDragPreview(cursor);
         }
 

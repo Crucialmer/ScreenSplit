@@ -33,15 +33,34 @@ namespace FancyWM.ViewModels
         [DerivedProperty(nameof(FocusRectangle))]
         public bool IsFocusRectangleVisible => m_focusRectangle.Width != 0;
 
-        public Rectangle PreviewRectangle { get => m_previewRectangle; set => SetField(ref m_previewRectangle, value); }
+        private Visibility m_previewVisibility = Visibility.Collapsed;
+        public Visibility PreviewVisibility { get => m_previewVisibility; set => SetField(ref m_previewVisibility, value); }
+
+        public Rectangle PreviewRectangle
+        {
+            get => m_previewRectangle;
+            set
+            {
+                SetField(ref m_previewRectangle, value);
+                PreviewVisibility = (value.Width > 0 && value.Height > 0) ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
 
         [DerivedProperty(nameof(PreviewRectangle))]
         public bool IsPreviewRectangleVisible => m_previewRectangle.Width != 0;
 
-        private string? m_previewTitle;
-        public string? PreviewTitle { get => m_previewTitle; set => SetField(ref m_previewTitle, value); }
+        private Visibility m_previewTitleVisibility = Visibility.Collapsed;
+        public Visibility PreviewTitleVisibility { get => m_previewTitleVisibility; set => SetField(ref m_previewTitleVisibility, value); }
 
-        [DerivedProperty(nameof(PreviewTitle))]
-        public Visibility PreviewTitleVisibility => !string.IsNullOrEmpty(m_previewTitle) ? Visibility.Visible : Visibility.Collapsed;
+        private string? m_previewTitle;
+        public string? PreviewTitle
+        {
+            get => m_previewTitle;
+            set
+            {
+                SetField(ref m_previewTitle, value);
+                PreviewTitleVisibility = !string.IsNullOrEmpty(value) ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
     }
 }

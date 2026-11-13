@@ -41,28 +41,22 @@
         </Rectangle>
 
         <Border
+            x:Name="PreviewBorder"
             BorderBrush="{theme:CssResource panel.preview/border-color}"
             BorderThickness="{theme:CssResource panel.preview/border-width}"
             CornerRadius="10"
             Background="{theme:CssResource panel.preview/background}"
-            Effect="{theme:CssResource panel.preview/filter}"
             Width="{Binding PreviewRectangle.Width}"
             Height="{Binding PreviewRectangle.Height}"
             Canvas.Left="{Binding PreviewRectangle.Left}"
-            Canvas.Top="{Binding PreviewRectangle.Top}">
-            <Border.Style>
-                <Style TargetType="Border">
-                    <Setter Property="Visibility" Value="Collapsed" />
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding Path=IsPreviewRectangleVisible}" Value="True">
-                            <Setter Property="Visibility" Value="Visible" />
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </Border.Style>
+            Canvas.Top="{Binding PreviewRectangle.Top}"
+            Visibility="{Binding PreviewVisibility}">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="24" ShadowDepth="4" Direction="270" Color="#000000" Opacity="0.55" />
+            </Border.Effect>
             <Grid>
                 <!-- Subtle dark shadow tint layer to clearly show original size state -->
-                <Border CornerRadius="8" Background="#24000000" Margin="1" />
+                <Border CornerRadius="8" Background="#30000000" Margin="1" />
 
                 <!-- Centered indicator badge -->
                 <Border HorizontalAlignment="Center" VerticalAlignment="Center"

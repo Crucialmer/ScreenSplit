@@ -91,6 +91,7 @@ namespace FancyWM
 #pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
         {
             InitializeComponent();
+            ThemeEngineManager.Initialize(Path.GetFullPath("themes"), "custom.css");
 
             m_logger = App.Current.Logger;
 
@@ -276,8 +277,6 @@ namespace FancyWM
             Show();
             Hide();
             ((HwndSource)PresentationSource.FromVisual(this)).AddHook(WndProc);
-
-            ThemeEngineManager.Initialize(Path.GetFullPath("themes"), "custom.css");
         }
 
         private UnmanagedResourceGuard? ApplySystemParameters()

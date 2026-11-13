@@ -53,14 +53,12 @@ namespace FancyWM.ViewModels
                     .Select(propName => type.GetProperty(propName)!);
                 foreach (var dep in deps)
                 {
-                    if (m_dependedBy.ContainsKey(dep))
+                    if (!m_dependedBy.TryGetValue(dep, out var list))
                     {
-                        m_dependedBy[dep].Add(prop);
+                        list = [];
+                        m_dependedBy[dep] = list;
                     }
-                    else
-                    {
-                        m_dependedBy[dep] = [dep];
-                    }
+                    list.Add(prop);
                 }
             }
         }

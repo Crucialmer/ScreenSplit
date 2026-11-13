@@ -31,7 +31,7 @@ namespace FancyWM.ThemeEngine.Wpf
             ArgumentNullException.ThrowIfNull(path);
             if (_current.Count == 0)
             {
-                throw new InvalidOperationException("Theme not initialized!");
+                return null;
             }
             if (_current.TryGetValue(path, out var val))
             {

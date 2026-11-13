@@ -127,6 +127,22 @@ namespace FancyWM
             {
                 AnchorSource = overlayAnchorSource
             };
+
+            var overlayView = new TilingOverlay
+            {
+                ViewModel = m_viewModel
+            };
+            Draggable.AddDragStartedHandler(overlayView, OnDragStarted);
+            Draggable.AddDragCompletedHandler(overlayView, OnDragCompleted);
+            Draggable.AddDraggingHandler(overlayView, OnDraggingEvent);
+            m_overlay.Content = overlayView;
+
+            m_overlay.NonHitTestableContent = new NonHitTestableTilingOverlay
+            {
+                ViewModel = m_viewModel
+            };
+            m_isOverlayInit = true;
+
             m_overlay.Show();
 
             m_panelItemPrimaryActionCommand = new DelegateCommand<TilingNodeViewModel>(OnOverlayPanelItemClick);
