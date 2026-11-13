@@ -5,51 +5,263 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:ui="http://schemas.modernwpf.com/2019"
         xmlns:local="clr-namespace:FancyWM.Windows"
-        xmlns:controls="clr-namespace:FancyWM.Controls"
         xmlns:res="clr-namespace:FancyWM.Resources"
         xmlns:viewmodels="clr-namespace:FancyWM.ViewModels"
         d:DataContext="{d:DesignInstance Type=viewmodels:SettingsViewModel}"
         mc:Ignorable="d"
-        Title="{x:Static res:Strings.Startup_Caption}"
+        Title="ScreenSplit 启动提示"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
         ResizeMode="NoResize"
         SizeToContent="Height"
-        Width="600"
+        Width="680"
         ShowActivated="True"
         WindowStartupLocation="CenterScreen"
-        Background="{DynamicResource SystemControlPageBackgroundAltHighBrush}"
+        FontFamily="Segoe UI Variable Text, -apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, Microsoft YaHei UI, sans-serif"
         Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}"
-        ui:ThemeManager.IsThemeAware="True">
-    <DockPanel LastChildFill="True">
-        <Border DockPanel.Dock="Left" Margin="15">
-            <Image Width="128" Height="128" Source="/Resources/Icon.ico" />
-        </Border>
-        <ui:SimpleStackPanel Orientation="Vertical" Margin="16" Spacing="16">
-            <TextBlock Style="{DynamicResource TitleTextBlockStyle}">
-                <Run Text="{x:Static res:Strings.Startup_FancyWMIsRunning}" />
-                <Run Text="🚀" />
-            </TextBlock>
-            <TextBlock Text="{x:Static res:Strings.Startup_InSystemTray}" Style="{DynamicResource SubtitleTextBlockStyle}" />
-            <StackPanel Orientation="Vertical">
-                <Border BorderThickness="1,1,1,0" CornerRadius="{DynamicResource ControlCornerRadiusTop}" Style="{DynamicResource SettingsItemStyle}">
-                    <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.Startup_Paragraph1}" />
-                </Border>
-                <Border BorderThickness="1,1,1,0" CornerRadius="0" Style="{DynamicResource SettingsItemStyle}">
-                    <TextBlock TextWrapping="Wrap" Text="{x:Static res:Strings.Startup_Paragraph2}" />
-                </Border>
-                <Border BorderThickness="1,1,1,0" CornerRadius="0" Style="{DynamicResource SettingsItemStyle}">
+        ui:ThemeManager.IsThemeAware="True"
+        MouseLeftButtonDown="OnWindowMouseDown">
+
+    <!-- macOS Soft Shadow Container -->
+    <Border Margin="28"
+            CornerRadius="20"
+            Background="{DynamicResource SystemControlPageBackgroundAltHighBrush}"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+            BorderThickness="1"
+            SnapsToDevicePixels="True">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="36" Direction="270" ShadowDepth="12" Opacity="0.32" Color="#000000" />
+        </Border.Effect>
+
+        <DockPanel LastChildFill="True">
+            <!-- macOS Window Title Bar with Traffic Light Controls -->
+            <Border DockPanel.Dock="Top"
+                    Height="44"
+                    Padding="18,0"
+                    Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                    CornerRadius="20,20,0,0"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                    BorderThickness="0,0,0,1"
+                    MouseLeftButtonDown="OnTitleBarMouseDown">
+                <Grid>
+                    <!-- macOS Traffic Light Window Controls -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left">
+                        <!-- Red (Close) -->
+                        <Button Click="OnCloseButtonClick"
+                                Width="13" Height="13"
+                                Padding="0" Margin="0,0,8,0"
+                                Cursor="Hand"
+                                Background="#FF5F56"
+                                BorderThickness="0"
+                                ToolTip="关闭窗口">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Width="13" Height="13" CornerRadius="6.5" Background="{TemplateBinding Background}" BorderBrush="#E0443E" BorderThickness="0.5">
+                                        <ui:FontIcon x:Name="CloseIcon" FontFamily="Segoe MDL2 Assets" Glyph="&#xE711;" FontSize="7.5" Foreground="#4D0000" Opacity="0" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="CloseIcon" Property="Opacity" Value="0.8" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <!-- Yellow (Minimize) -->
+                        <Button Click="OnMinimizeButtonClick"
+                                Width="13" Height="13"
+                                Padding="0" Margin="0,0,8,0"
+                                Cursor="Hand"
+                                Background="#FFBD2E"
+                                BorderThickness="0"
+                                ToolTip="最小化">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Width="13" Height="13" CornerRadius="6.5" Background="{TemplateBinding Background}" BorderBrush="#DEA123" BorderThickness="0.5">
+                                        <ui:FontIcon x:Name="MinIcon" FontFamily="Segoe MDL2 Assets" Glyph="&#xE738;" FontSize="7.5" Foreground="#5A3A00" Opacity="0" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="MinIcon" Property="Opacity" Value="0.8" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <!-- Green (Disabled/Placeholder) -->
+                        <Border Width="13" Height="13" CornerRadius="6.5" Background="#27C93F" BorderBrush="#1AAB29" BorderThickness="0.5" />
+                    </StackPanel>
+
+                    <!-- Title Centered in macOS Style -->
+                    <TextBlock Text="ScreenSplit 便携分屏"
+                               FontSize="12.5"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+
+            <!-- Main Content Area -->
+            <StackPanel Margin="24,18,24,20" Orientation="Vertical">
+                <!-- Hero App Identity Header -->
+                <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                        BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                        BorderThickness="1"
+                        CornerRadius="14"
+                        Padding="16,14"
+                        Margin="0,0,0,16">
                     <DockPanel LastChildFill="True">
-                        <Border DockPanel.Dock="Right" Width="64" Height="20">
-                            <CheckBox IsChecked="{Binding Path=ShowStartupWindow, Mode=TwoWay}" />
+                        <!-- App Icon Squircle with Shadow -->
+                        <Border DockPanel.Dock="Left"
+                                Width="48" Height="48"
+                                CornerRadius="12"
+                                Background="#007AFF"
+                                Margin="0,0,16,0">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="10" ShadowDepth="3" Direction="270" Opacity="0.3" Color="#007AFF" />
+                            </Border.Effect>
+                            <Image Source="/Resources/Icon.ico" Width="32" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
-                        <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.General_ShowStartupWindow}" />
+
+                        <StackPanel VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="ScreenSplit" FontWeight="SemiBold" FontSize="18" Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}" />
+                                <Border Background="#10007AFF" BorderBrush="#30007AFF" BorderThickness="1" CornerRadius="6" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="v2.19.1 精简版" FontSize="11" FontWeight="Medium" Foreground="#007AFF" />
+                                </Border>
+                            </StackPanel>
+                            <TextBlock Text="软件已就绪并常驻右下角系统托盘 · 纯鼠标直觉交互 · 纯绿色便携"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}"
+                                       Margin="0,4,0,0" />
+                        </StackPanel>
                     </DockPanel>
                 </Border>
-                <Border CornerRadius="{DynamicResource ControlCornerRadiusBottom}" Style="{DynamicResource SettingsItemStyle}">
-                    <TextBlock TextWrapping="Wrap">
-                        <Run FontWeight="Bold" Text="{x:Static res:Strings.Startup_FirstTimeUsers}"/> <Run Text="{x:Static res:Strings.PleaseSee}" /> <Hyperlink Click="OnSettingsClick"><Run Text="{x:Static res:Strings.Help_Caption}" /></Hyperlink>.
-                    </TextBlock>
-                </Border>
+
+                <!-- macOS Style Feature Guide Cards -->
+                <ui:SimpleStackPanel Spacing="8">
+                    <!-- Feature 1: Four Edges Snap -->
+                    <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="14,10">
+                        <DockPanel LastChildFill="True">
+                            <Border DockPanel.Dock="Left" Width="30" Height="30" CornerRadius="8" Background="#007AFF" Margin="0,0,12,0" VerticalAlignment="Center">
+                                <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE737;" Foreground="White" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="四周边缘智能停靠（二分之一分屏）" FontWeight="Medium" FontSize="13" Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}" />
+                                <TextBlock Text="直接按住标题栏拖拽窗口至屏幕左、右、上、下任意边缘，松开即刻精准占用对应半屏。" FontSize="11.5" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+
+                    <!-- Feature 2: Four Corners Snap -->
+                    <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="14,10">
+                        <DockPanel LastChildFill="True">
+                            <Border DockPanel.Dock="Left" Width="30" Height="30" CornerRadius="8" Background="#34C759" Margin="0,0,12,0" VerticalAlignment="Center">
+                                <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE784;" Foreground="White" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="四个角落精细停靠（四分之一分屏）" FontWeight="Medium" FontSize="13" Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}" />
+                                <TextBlock Text="拖拽窗口至屏幕左上角、右上角、左下角、右下角任意角落，松开自动占用四分之一屏幕。" FontSize="11.5" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+
+                    <!-- Feature 3: Drag away to restore -->
+                    <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="14,10">
+                        <DockPanel LastChildFill="True">
+                            <Border DockPanel.Dock="Left" Width="30" Height="30" CornerRadius="8" Background="#FF9500" Margin="0,0,12,0" VerticalAlignment="Center">
+                                <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE777;" Foreground="White" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="离开边缘自动恢复原始状态" FontWeight="Medium" FontSize="13" Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}" />
+                                <TextBlock Text="按住标题栏将已停靠边缘的窗口拖离边缘至任意区域，松开时自动还原为停靠前的原始尺寸。" FontSize="11.5" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+
+                    <!-- Feature 4: Free Partition Management -->
+                    <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="14,10">
+                        <DockPanel LastChildFill="True">
+                            <Border DockPanel.Dock="Left" Width="30" Height="30" CornerRadius="8" Background="#AF52DE" Margin="0,0,12,0" VerticalAlignment="Center">
+                                <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE7C9;" Foreground="White" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="切分区自由管理（灵活进出）" FontWeight="Medium" FontSize="13" Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}" />
+                                <TextBlock Text="按住 Shift 键拖拽窗口可放入切分区；直接拖动已分屏窗口即可瞬间摆脱切分区恢复自由浮动。" FontSize="11.5" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                </ui:SimpleStackPanel>
+
+                <!-- Divider -->
+                <Rectangle Height="1" Fill="{DynamicResource SystemControlForegroundBaseLowBrush}" Margin="0,16,0,14" Opacity="0.4" />
+
+                <!-- Bottom Actions Bar -->
+                <DockPanel LastChildFill="False">
+                    <!-- Left: Checkbox to toggle startup show -->
+                    <CheckBox DockPanel.Dock="Left"
+                              IsChecked="{Binding Path=ShowStartupWindow, Mode=TwoWay}"
+                              VerticalAlignment="Center">
+                        <TextBlock Text="开机与启动时显示此提示" FontSize="12.5" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" />
+                    </CheckBox>
+
+                    <!-- Right Buttons: macOS Pill Button Styles -->
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Detailed Help Button -->
+                        <Button Click="OnHelpClick"
+                                Margin="0,0,10,0"
+                                Padding="14,6"
+                                Cursor="Hand"
+                                Background="Transparent"
+                                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                BorderThickness="1">
+                            <Button.Resources>
+                                <CornerRadius x:Key="ControlCornerRadius">8</CornerRadius>
+                            </Button.Resources>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE897;" FontSize="12" Margin="0,0,6,0" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" />
+                                <TextBlock Text="详细指南" FontSize="12.5" FontWeight="Medium" Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}" />
+                            </StackPanel>
+                        </Button>
+
+                        <!-- Primary "Get Started" Pill Button -->
+                        <Button Click="OnStartExperienceClick"
+                                Padding="18,6"
+                                Cursor="Hand"
+                                Background="#007AFF"
+                                Foreground="White"
+                                BorderThickness="0">
+                            <Button.Resources>
+                                <CornerRadius x:Key="ControlCornerRadius">8</CornerRadius>
+                            </Button.Resources>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="开始使用" FontSize="12.5" FontWeight="SemiBold" Foreground="White" Margin="0,0,4,0" />
+                                <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE76C;" FontSize="11" Foreground="White" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </DockPanel>
             </StackPanel>
-        </ui:SimpleStackPanel>
-    </DockPanel>
+        </DockPanel>
+    </Border>
 </Window>
