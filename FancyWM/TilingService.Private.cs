@@ -324,11 +324,17 @@ namespace FancyWM
 
                         using (m_backendLock.EnterScope())
                         {
+                            // 只有在按住 Shift 键时，才显示分屏吸附预览框
+                            if (!isSwapping)
+                            {
+                                return null;
+                            }
+
                             if (m_backend.HasWindow(window))
                             {
-                                return m_backend.MockMoveWindow(window, pt, allowNesting: !isSwapping).preArrange;
+                                return m_backend.MockMoveWindow(window, pt, allowNesting: false).preArrange;
                             }
-                            else if (isSwapping && CanManage(window, ignoreFloating: true))
+                            else if (CanManage(window, ignoreFloating: true))
                             {
                                 var targetNode = m_backend.NodeAtPoint(m_workspace.VirtualDesktopManager.CurrentDesktop, pt);
                                 if (targetNode != null)
@@ -1123,12 +1129,46 @@ namespace FancyWM
             {
                 if (m_backend.HasWindow(window))
                 {
-                    m_logger.Debug("Window {Window} size is unchanged, attempting to insert window at {Position}", window.DebugString(), pt);
-                    m_backend.MoveWindow(window, pt, allowNesting: !isSwapping);
-                    m_backend.SetFocus(window);
+                    if (isSwapping)
+                    {
+                        // 只有在按住 Shift 键时，才在切分区内调整位置或放入
+                        m_logger.Debug("Window {Window} moved with Shift, repositioning in tiling tree at {Position}", window.DebugString(), pt);
+                        m_backend.MoveWindow(window, pt, allowNesting: false);
+                        m_backend.SetFocus(window);
+                    }
+                    else
+                    {
+                        // 未按 Shift 键拖动：摆脱切分区（恢复为自由浮动窗口）
+                        var node = m_backend.FindWindow(window);
+                        var curPos = window.Position;
+                        var shouldFloat = true;
+                        if (node != null)
+                        {
+                            var tileRect = node.ComputedRectangle;
+                            var dx = Math.Abs(curPos.Left - tileRect.Left);
+                            var dy = Math.Abs(curPos.Top - tileRect.Top);
+                            // 若位移极小（<=8px），视为单纯点击，不脱离分屏
+                            if (dx <= 8 && dy <= 8)
+                            {
+                                shouldFloat = false;
+                            }
+                        }
+
+                        if (shouldFloat)
+                        {
+                            m_logger.Information("Window {Window} moved without Shift, detaching from tiling partition (floating)", window.DebugString());
+                            using (m_floatingSetLock.EnterScope())
+                            {
+                                m_floatingSet.Add(window);
+                            }
+                            m_backend.UnregisterWindow(window);
+                            InvalidateLayout();
+                        }
+                    }
                 }
                 else if (isSwapping && CanManage(window, ignoreFloating: true))
                 {
+                    // 浮动窗口：只有在按住 Shift 键拖动时，才放进切分区中
                     m_logger.Information("User dragged floating window {Window} with Shift, registering into tiling backend at {Position}", window.DebugString(), pt);
                     using (m_floatingSetLock.EnterScope())
                     {
@@ -1155,7 +1195,7 @@ namespace FancyWM
             if (!m_active)
                 return;
 
-            if (m_delayReposition && m_currentInteraction == UserInteraction.Moving)
+            if (m_currentInteraction == UserInteraction.Moving)
             {
                 try
                 {
