@@ -174,6 +174,7 @@ namespace FancyWM
         private readonly Dictionary<IWindow, Rectangle> m_activeDragOriginalRect = [];
         private readonly Utilities.DebugLock m_preSnapRectanglesLock = new(LockThreshold);
         private double m_dragGrabRatioX = 0.5;
+        private IWindow? m_movingWindow;
 
         private readonly CompositeDisposable m_subscriptions = [];
         private readonly IAnimationThread m_animationThread;

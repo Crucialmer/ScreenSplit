@@ -456,6 +456,42 @@ namespace FancyWM
                         {
                             return GetSnapRectangle(snapZone, m_display.WorkArea);
                         }
+
+                        // 方案二：如果窗口是从边缘/角落拖出，在自由区展示半透明原始尺寸轮廓跟随光标，方便自由放置
+                        if (m_movingWindow != null)
+                        {
+                            Rectangle preSnapRect = default;
+                            bool hasPreSnap = false;
+                            using (m_preSnapRectanglesLock.EnterScope())
+                            {
+                                hasPreSnap = m_preSnapRectangles.TryGetValue(m_movingWindow, out preSnapRect);
+                            }
+
+                            if (hasPreSnap && preSnapRect.Width > 0 && preSnapRect.Height > 0)
+                            {
+                                var wa = m_display.WorkArea;
+                                int targetW = preSnapRect.Width;
+                                int targetH = preSnapRect.Height;
+
+                                if (targetW >= wa.Width && targetH >= wa.Height)
+                                {
+                                    targetW = (int)(wa.Width * 0.65);
+                                    targetH = (int)(wa.Height * 0.70);
+                                }
+                                targetW = Math.Clamp(targetW, 400, (int)(wa.Width * 0.95));
+                                targetH = Math.Clamp(targetH, 300, (int)(wa.Height * 0.95));
+
+                                int targetX = pt.X - (int)(targetW * m_dragGrabRatioX);
+                                int targetY = pt.Y - 15;
+
+                                if (targetX < wa.Left) targetX = wa.Left;
+                                if (targetX + targetW > wa.Right) targetX = wa.Right - targetW;
+                                if (targetY < wa.Top) targetY = wa.Top;
+                                if (targetY + targetH > wa.Bottom) targetY = wa.Bottom - targetH;
+
+                                return Rectangle.OffsetAndSize(targetX, targetY, targetW, targetH);
+                            }
+                        }
                     }
 
                     if (m_movingPanelNode != null)
@@ -1192,6 +1228,10 @@ namespace FancyWM
             m_logger.Information("Window {Window} removed from workspace", e.Source.DebugString());
 
             UnbindEventHandlers(e.Source);
+            if (Equals(m_movingWindow, e.Source))
+            {
+                m_movingWindow = null;
+            }
             using (m_savedLocationsLock.EnterScope())
             {
                 m_savedLocations.Remove(e.Source);
@@ -1350,6 +1390,7 @@ namespace FancyWM
             if (!m_active)
                 return;
 
+            m_movingWindow = null;
             SetPreviewRectangle(null);
 
             if (m_currentInteraction == UserInteraction.Moving || CanManage(e.Source, ignoreFloating: true))
@@ -1697,6 +1738,7 @@ namespace FancyWM
                 m_ignoreRepositionSet.Add(e.Source);
             }
             m_currentInteraction = UserInteraction.Starting;
+            m_movingWindow = e.Source;
 
             var cursor = m_workspace.CursorLocation;
             if (e.OldPosition.Width > 0)
