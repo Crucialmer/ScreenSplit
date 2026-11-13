@@ -74,8 +74,6 @@ namespace FancyWM
         private KeybindingDictionary m_keybindings;
         private readonly IntPtr m_hwnd;
         private readonly AnimationThread m_animationThread;
-        private bool m_enableRateReviewRequests;
-        private DateTime m_reviewTooltipShown;
         private bool m_showContextHints;
         private bool m_soundOnFailure;
         private bool m_checkForUpdates;
@@ -119,7 +117,6 @@ namespace FancyWM
 
             var settings = App.Current.AppState.Settings
                 .Do(x => m_keybindings = x.Keybindings)
-                .Do(x => m_enableRateReviewRequests = x.RemindToRateReview)
                 .Do(x => m_showContextHints = x.ShowContextHints)
                 .Do(x => m_soundOnFailure = x.SoundOnFailure)
                 .Do(x => m_checkForUpdates = x.CheckForUpdates)
@@ -250,15 +247,6 @@ namespace FancyWM
             };
             m_notifyIcon.TrayLeftMouseDown += OnNotifyIconLeftMouseDown;
             m_notifyIcon.TrayRightMouseDown += OnNotifyIconRightMouseDown;
-            m_notifyIcon.TrayBalloonTipClicked += OnBalloonTipClicked;
-
-            try
-            {
-                m_notifyIcon.ShowBalloonTip("ScreenSplit", "ScreenSplit 便携分屏已启动！\n• 新窗口默认保持浮动\n• 按住 Shift 拖动窗口可直接加入切分\n• 快捷键：Win+Shift+H / V", BalloonIcon.Info);
-            }
-            catch
-            {
-            }
 
             m_hideCountdownTimer = new CountdownTimer();
             m_contextMenu = (ContextMenu)FindResource("NotifierContextMenu");
@@ -382,14 +370,6 @@ namespace FancyWM
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
-            if (m_workspace.VirtualDesktopManager.GetType().Name == "DummyVirtualDesktopManager" && Environment.OSVersion.Version.Build >= 17661 && m_notifyVirtualDesktopServiceIncompatibility)
-            {
-                if (new Windows.MessageBox { IconGlyph = "\xF1AD", Title = Strings.Messages_WindowsVersionNotSupported_Caption + " OS Build: " + Environment.OSVersion.Version.Build, Message = Strings.Messages_WindowsVersionNotSupported_Description }.ShowDialog() == true)
-                {
-                    m_logger.Warning("Unsupported OS Version: " + Environment.OSVersion.Version.ToString());
-                }
-            }
-
             if (App.Current.Services.GetService<ReleaseChecker>() is ReleaseChecker releaseChecker)
             {
                 _ = Dispatcher.BeginInvoke(async () =>
@@ -1010,29 +990,11 @@ namespace FancyWM
             }
         }
 
-        private async void OnBalloonTipClicked(object? sender, RoutedEventArgs e)
-        {
-            if (DateTime.UtcNow - m_reviewTooltipShown < TimeSpan.FromSeconds(10))
-            {
-                new AboutWindow().Show();
-                await App.Current.AppState.Settings.SaveAsync(x =>
-                {
-                    return x with { RemindToRateReview = false };
-                });
-            }
-        }
-
         private async void OnCmdSequenceBegin(object? sender, EventArgs e)
         {
             long currentId = ++m_cmdSequenceId;
 
             m_logger.Debug($"Command sequence {m_cmdSequenceId} started");
-            if (m_stopwatch.Elapsed >= RateReviewDelay && m_enableRateReviewRequests)
-            {
-                m_enableRateReviewRequests = false;
-                m_reviewTooltipShown = DateTime.UtcNow;
-                m_notifyIcon.ShowBalloonTip(Strings.Messages_EnjoyingFancyWM, Strings.Messages_AskForReview, BalloonIcon.None);
-            }
 
             await Dispatcher.InvokeAsync(async () =>
             {
