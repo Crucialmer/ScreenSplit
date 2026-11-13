@@ -166,7 +166,9 @@ namespace FancyWM
             var repositionTask = RepositionAsync();
 
             m_gui.UpdateOverlay(snapshot, focusedPath);
-            m_gui.PreviewRectangle = GetPreviewRectangle();
+            var previewInfo = GetPreviewInfo();
+            m_gui.PreviewTitle = previewInfo.Title;
+            m_gui.PreviewRectangle = previewInfo.Rect;
 
             if (m_showPreviewFocus)
             {
@@ -318,16 +320,49 @@ namespace FancyWM
             return null;
         }
 
-        private void SetPreviewRectangle(Rectangle? rect)
+        private void SetPreviewRectangle(Rectangle? rect, string? title = null)
         {
             if (m_dispatcher.CheckAccess())
             {
+                m_gui.PreviewTitle = title;
                 m_gui.PreviewRectangle = rect;
             }
             else
             {
-                m_dispatcher.InvokeAsync(() => m_gui.PreviewRectangle = rect);
+                m_dispatcher.InvokeAsync(() =>
+                {
+                    m_gui.PreviewTitle = title;
+                    m_gui.PreviewRectangle = rect;
+                });
             }
+        }
+
+        private static bool IsWindowSnapped(Rectangle pos, Rectangle wa)
+        {
+            if (pos.Width <= 0 || pos.Height <= 0) return false;
+
+            bool isHalfWidth = Math.Abs(pos.Width - wa.Width / 2) < 30;
+            bool isFullWidth = Math.Abs(pos.Width - wa.Width) < 30;
+            bool isHalfHeight = Math.Abs(pos.Height - wa.Height / 2) < 30;
+            bool isFullHeight = Math.Abs(pos.Height - wa.Height) < 30;
+
+            if ((isHalfWidth && isFullHeight) || (isFullWidth && isHalfHeight))
+                return true;
+
+            if (isHalfWidth && isHalfHeight)
+                return true;
+
+            bool isNearLeft = Math.Abs(pos.Left - wa.Left) < 20;
+            bool isNearRight = Math.Abs(pos.Right - wa.Right) < 20;
+            bool isNearTop = Math.Abs(pos.Top - wa.Top) < 20;
+            bool isNearBottom = Math.Abs(pos.Bottom - wa.Bottom) < 20;
+
+            if ((isNearLeft || isNearRight) && (pos.Width <= wa.Width * 0.55 || isFullHeight))
+                return true;
+            if ((isNearTop || isNearBottom) && (pos.Height <= wa.Height * 0.55 || isFullWidth))
+                return true;
+
+            return false;
         }
 
         private ScreenSnapZone GetSnapZone(Point pt, Rectangle wa)
@@ -442,74 +477,110 @@ namespace FancyWM
             }
         }
 
-        private Rectangle? GetPreviewRectangle()
+        private (Rectangle? Rect, string? Title) GetPreviewInfo()
         {
-            if (m_currentInteraction == UserInteraction.Moving || m_movingPanelNode != null)
+            if (m_currentInteraction == UserInteraction.Moving || m_movingWindow != null || m_movingPanelNode != null)
             {
                 try
                 {
                     var pt = m_workspace.CursorLocation;
                     if (m_display.Bounds.Contains(pt))
                     {
-                        var snapZone = GetSnapZone(pt, m_display.WorkArea);
-                        if (snapZone != ScreenSnapZone.None)
+                        if (m_movingPanelNode == null)
                         {
-                            return GetSnapRectangle(snapZone, m_display.WorkArea);
-                        }
-
-                        // 方案二：如果窗口是从边缘/角落拖出，在自由区展示半透明原始尺寸轮廓跟随光标，方便自由放置
-                        if (m_movingWindow != null)
-                        {
-                            Rectangle preSnapRect = default;
-                            bool hasPreSnap = false;
-                            using (m_preSnapRectanglesLock.EnterScope())
+                            var snapZone = GetSnapZone(pt, m_display.WorkArea);
+                            if (snapZone != ScreenSnapZone.None)
                             {
-                                hasPreSnap = m_preSnapRectangles.TryGetValue(m_movingWindow, out preSnapRect);
-                            }
-
-                            if (hasPreSnap && preSnapRect.Width > 0 && preSnapRect.Height > 0)
-                            {
-                                var wa = m_display.WorkArea;
-                                int targetW = preSnapRect.Width;
-                                int targetH = preSnapRect.Height;
-
-                                if (targetW >= wa.Width && targetH >= wa.Height)
+                                string snapTitle = snapZone switch
                                 {
-                                    targetW = (int)(wa.Width * 0.65);
-                                    targetH = (int)(wa.Height * 0.70);
+                                    ScreenSnapZone.LeftHalf => "停靠左半屏",
+                                    ScreenSnapZone.RightHalf => "停靠右半屏",
+                                    ScreenSnapZone.TopHalf => "停靠上半屏",
+                                    ScreenSnapZone.BottomHalf => "停靠下半屏",
+                                    ScreenSnapZone.TopLeftQuarter => "停靠左上角",
+                                    ScreenSnapZone.TopRightQuarter => "停靠右上角",
+                                    ScreenSnapZone.BottomLeftQuarter => "停靠左下角",
+                                    ScreenSnapZone.BottomRightQuarter => "停靠右下角",
+                                    _ => "边缘停靠"
+                                };
+                                return (GetSnapRectangle(snapZone, m_display.WorkArea), snapTitle);
+                            }
+
+                            // 方案二：如果窗口是从边缘/角落拖出，在自由区展示半透明原始尺寸轮廓跟随光标，方便自由放置
+                            if (m_movingWindow != null)
+                            {
+                                Rectangle preSnapRect = default;
+                                bool hasPreSnap = false;
+                                using (m_preSnapRectanglesLock.EnterScope())
+                                {
+                                    hasPreSnap = m_preSnapRectangles.TryGetValue(m_movingWindow, out preSnapRect);
                                 }
-                                targetW = Math.Clamp(targetW, 400, (int)(wa.Width * 0.95));
-                                targetH = Math.Clamp(targetH, 300, (int)(wa.Height * 0.95));
 
-                                int targetX = pt.X - (int)(targetW * m_dragGrabRatioX);
-                                int targetY = pt.Y - 15;
+                                var wa = m_display.WorkArea;
+                                if (!hasPreSnap || preSnapRect.Width <= 0 || preSnapRect.Height <= 0)
+                                {
+                                    var curPos = m_movingWindow.Position;
+                                    if (IsWindowSnapped(curPos, wa))
+                                    {
+                                        int defaultW = (int)(wa.Width * 0.60);
+                                        int defaultH = (int)(wa.Height * 0.65);
+                                        preSnapRect = Rectangle.OffsetAndSize(
+                                            wa.Left + (wa.Width - defaultW) / 2,
+                                            wa.Top + (wa.Height - defaultH) / 2,
+                                            defaultW, defaultH);
+                                        hasPreSnap = true;
+                                        using (m_preSnapRectanglesLock.EnterScope())
+                                        {
+                                            m_preSnapRectangles[m_movingWindow] = preSnapRect;
+                                        }
+                                    }
+                                }
 
-                                if (targetX < wa.Left) targetX = wa.Left;
-                                if (targetX + targetW > wa.Right) targetX = wa.Right - targetW;
-                                if (targetY < wa.Top) targetY = wa.Top;
-                                if (targetY + targetH > wa.Bottom) targetY = wa.Bottom - targetH;
+                                if (hasPreSnap && preSnapRect.Width > 0 && preSnapRect.Height > 0)
+                                {
+                                    int targetW = preSnapRect.Width;
+                                    int targetH = preSnapRect.Height;
 
-                                return Rectangle.OffsetAndSize(targetX, targetY, targetW, targetH);
+                                    if (targetW >= wa.Width && targetH >= wa.Height)
+                                    {
+                                        targetW = (int)(wa.Width * 0.60);
+                                        targetH = (int)(wa.Height * 0.65);
+                                    }
+                                    targetW = Math.Clamp(targetW, 400, (int)(wa.Width * 0.95));
+                                    targetH = Math.Clamp(targetH, 300, (int)(wa.Height * 0.95));
+
+                                    int targetX = pt.X - (int)(targetW * m_dragGrabRatioX);
+                                    int targetY = pt.Y - 15;
+
+                                    if (targetX < wa.Left) targetX = wa.Left;
+                                    if (targetX + targetW > wa.Right) targetX = wa.Right - targetW;
+                                    if (targetY < wa.Top) targetY = wa.Top;
+                                    if (targetY + targetH > wa.Bottom) targetY = wa.Bottom - targetH;
+
+                                    return (Rectangle.OffsetAndSize(targetX, targetY, targetW, targetH), "还原原始尺寸");
+                                }
                             }
                         }
-                    }
 
-                    if (m_movingPanelNode != null)
-                    {
-                        using (m_backendLock.EnterScope())
+                        if (m_movingPanelNode != null)
                         {
-                            return m_backend.MockMoveNode(m_movingPanelNode, pt, allowNesting: false).preArrange;
+                            var wa = m_display.WorkArea;
+                            int defaultW = (int)(wa.Width * 0.60);
+                            int defaultH = (int)(wa.Height * 0.65);
+                            int targetX = Math.Clamp(pt.X - defaultW / 2, wa.Left, wa.Right - defaultW);
+                            int targetY = Math.Clamp(pt.Y - 15, wa.Top, wa.Bottom - defaultH);
+                            return (Rectangle.OffsetAndSize(targetX, targetY, defaultW, defaultH), null);
                         }
-                    }
 
-                    return null;
+                        return (null, null);
+                    }
                 }
                 catch
                 {
-                    return null;
+                    return (null, null);
                 }
             }
-            return null;
+            return (null, null);
         }
 
         private void MoveToParentPanel(TilingNode node)
@@ -718,6 +789,12 @@ namespace FancyWM
 
         private void OnCursorLocationChanged(object? sender, CursorLocationChangedEventArgs e)
         {
+            if (m_currentInteraction == UserInteraction.Moving || m_movingWindow != null)
+            {
+                var preview = GetPreviewInfo();
+                SetPreviewRectangle(preview.Rect, preview.Title);
+            }
+
             if (PendingIntent == null)
                 return;
 
@@ -1294,14 +1371,15 @@ namespace FancyWM
                         {
                             var currentPos = window.Position;
                             if (currentPos.Width > 0 && currentPos.Height > 0 &&
-                                (currentPos.Width < wa.Width * 0.95 || currentPos.Height < wa.Height * 0.95))
+                                (currentPos.Width < wa.Width * 0.95 || currentPos.Height < wa.Height * 0.95) &&
+                                !IsWindowSnapped(currentPos, wa))
                             {
                                 m_preSnapRectangles[window] = currentPos;
                             }
                             else
                             {
-                                int defaultW = (int)(wa.Width * 0.65);
-                                int defaultH = (int)(wa.Height * 0.70);
+                                int defaultW = (int)(wa.Width * 0.60);
+                                int defaultH = (int)(wa.Height * 0.65);
                                 m_preSnapRectangles[window] = Rectangle.OffsetAndSize(
                                     wa.Left + (wa.Width - defaultW) / 2,
                                     wa.Top + (wa.Height - defaultH) / 2,
@@ -1341,6 +1419,21 @@ namespace FancyWM
                 m_activeDragOriginalRect.Remove(window);
             }
 
+            if (!hadPreSnap)
+            {
+                var curPos = window.Position;
+                if (IsWindowSnapped(curPos, wa))
+                {
+                    int defaultW = (int)(wa.Width * 0.60);
+                    int defaultH = (int)(wa.Height * 0.65);
+                    preSnapRect = Rectangle.OffsetAndSize(
+                        wa.Left + (wa.Width - defaultW) / 2,
+                        wa.Top + (wa.Height - defaultH) / 2,
+                        defaultW, defaultH);
+                    hadPreSnap = true;
+                }
+            }
+
             if (hadPreSnap && preSnapRect.Width > 0 && preSnapRect.Height > 0)
             {
                 m_logger.Information("Window {Window} dragged away from edge/corner, restoring pre-snap rectangle {Rect}",
@@ -1351,8 +1444,8 @@ namespace FancyWM
 
                 if (targetW >= wa.Width && targetH >= wa.Height)
                 {
-                    targetW = (int)(wa.Width * 0.65);
-                    targetH = (int)(wa.Height * 0.70);
+                    targetW = (int)(wa.Width * 0.60);
+                    targetH = (int)(wa.Height * 0.65);
                 }
                 targetW = Math.Clamp(targetW, 400, (int)(wa.Width * 0.95));
                 targetH = Math.Clamp(targetH, 300, (int)(wa.Height * 0.95));
@@ -1391,7 +1484,8 @@ namespace FancyWM
                 return;
 
             m_movingWindow = null;
-            SetPreviewRectangle(null);
+            m_isDraggingTitleBar = false;
+            SetPreviewRectangle(null, null);
 
             if (m_currentInteraction == UserInteraction.Moving || CanManage(e.Source, ignoreFloating: true))
             {
@@ -1457,7 +1551,9 @@ namespace FancyWM
 
             if (m_currentInteraction == UserInteraction.Starting)
             {
-                if (e.OldPosition.Size == e.NewPosition.Size)
+                bool isSizePreserved = Math.Abs(e.OldPosition.Width - e.NewPosition.Width) <= 5 &&
+                                       Math.Abs(e.OldPosition.Height - e.NewPosition.Height) <= 5;
+                if (isSizePreserved || m_isDraggingTitleBar)
                 {
                     m_currentInteraction = UserInteraction.Moving;
                 }
@@ -1481,9 +1577,10 @@ namespace FancyWM
                     return;
                 }
 
-                if (m_currentInteraction == UserInteraction.Moving)
+                if (m_currentInteraction == UserInteraction.Moving || m_movingWindow != null)
                 {
-                    SetPreviewRectangle(GetPreviewRectangle());
+                    var preview = GetPreviewInfo();
+                    SetPreviewRectangle(preview.Rect, preview.Title);
                 }
                 else
                 {
@@ -1741,13 +1838,26 @@ namespace FancyWM
             m_movingWindow = e.Source;
 
             var cursor = m_workspace.CursorLocation;
-            if (e.OldPosition.Width > 0)
+            var startPos = e.OldPosition.Width > 0 ? e.OldPosition : e.Source.Position;
+            if (startPos.Width > 0)
             {
-                m_dragGrabRatioX = Math.Clamp((cursor.X - e.OldPosition.Left) / (double)e.OldPosition.Width, 0.1, 0.9);
+                m_dragGrabRatioX = Math.Clamp((cursor.X - startPos.Left) / (double)startPos.Width, 0.1, 0.9);
             }
             else
             {
                 m_dragGrabRatioX = 0.5;
+            }
+
+            m_isDraggingTitleBar = (cursor.Y >= startPos.Top - 15 && cursor.Y <= startPos.Top + 65 &&
+                                    cursor.X >= startPos.Left - 10 && cursor.X <= startPos.Right + 10);
+
+            var wa = m_display.WorkArea;
+            if (!IsWindowSnapped(startPos, wa))
+            {
+                using (m_preSnapRectanglesLock.EnterScope())
+                {
+                    m_activeDragOriginalRect[e.Source] = startPos;
+                }
             }
         }
 

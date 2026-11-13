@@ -175,6 +175,7 @@ namespace FancyWM
         private readonly Utilities.DebugLock m_preSnapRectanglesLock = new(LockThreshold);
         private double m_dragGrabRatioX = 0.5;
         private IWindow? m_movingWindow;
+        private bool m_isDraggingTitleBar = false;
 
         private readonly CompositeDisposable m_subscriptions = [];
         private readonly IAnimationThread m_animationThread;

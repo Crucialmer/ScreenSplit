@@ -105,9 +105,9 @@ namespace FancyWM.Windows
             _ = SetWindowLongPtr(new(m_hwnd), GetWindowLongPtr_nIndex.GWLP_HWNDPARENT, m_nonHitTestableHwnd);
 
             _ = SetWindowLongPtr(new(m_hwnd), GetWindowLongPtr_nIndex.GWL_EXSTYLE,
-                (int)(WINDOWS_EX_STYLE.WS_EX_TOOLWINDOW | WINDOWS_EX_STYLE.WS_EX_NOACTIVATE));
+                (int)(WINDOWS_EX_STYLE.WS_EX_TOOLWINDOW | WINDOWS_EX_STYLE.WS_EX_NOACTIVATE | WINDOWS_EX_STYLE.WS_EX_TOPMOST));
             _ = SetWindowLongPtr(new(m_nonHitTestableHwnd), GetWindowLongPtr_nIndex.GWL_EXSTYLE,
-                (int)(WINDOWS_EX_STYLE.WS_EX_TOOLWINDOW | WINDOWS_EX_STYLE.WS_EX_TRANSPARENT | WINDOWS_EX_STYLE.WS_EX_NOACTIVATE));
+                (int)(WINDOWS_EX_STYLE.WS_EX_TOOLWINDOW | WINDOWS_EX_STYLE.WS_EX_TRANSPARENT | WINDOWS_EX_STYLE.WS_EX_NOACTIVATE | WINDOWS_EX_STYLE.WS_EX_TOPMOST));
 
             DisableWindow(m_hwnd);
             DisableWindow(m_nonHitTestableHwnd);
@@ -176,35 +176,9 @@ namespace FancyWM.Windows
 
         public void UpdatePositions()
         {
-            var anchor = AnchorSource != null
-                ? AnchorSource()
-                : new IntPtr(-1);
-
-            // Reorder front .. back (front is drawn on top)
-            // Goal: beforeAnchor -> m_hwnd -> m_nonHitTestableHwnd -> anchor
-            var beforeAnchor = PInvoke.GetWindow(new(anchor), GetWindow_uCmdFlags.GW_HWNDPREV);
-            if (PInvoke.GetWindow(new(m_hwnd), GetWindow_uCmdFlags.GW_HWNDNEXT).Value == beforeAnchor)
-            {
-                return;
-            }
-
             var swpFlags = SetWindowPos_uFlags.SWP_NOMOVE | SetWindowPos_uFlags.SWP_NOSIZE | SetWindowPos_uFlags.SWP_NOACTIVATE | SetWindowPos_uFlags.SWP_NOSENDCHANGING;
-            if (beforeAnchor.Value == default)
-            {
-                if (PInvoke.IsWindow(new(anchor)))
-                {
-                    PInvoke.SetWindowPos(new(m_hwnd), new(anchor), 0, 0, 0, 0, swpFlags);
-                    PInvoke.SetWindowPos(new(anchor), new(m_hwnd), 0, 0, 0, 0, swpFlags);
-                }
-                else
-                {
-                    PInvoke.SetWindowPos(new(m_hwnd), new(), 0, 0, 0, 0, swpFlags);
-                }
-            }
-            else
-            {
-                PInvoke.SetWindowPos(new(m_hwnd), new(beforeAnchor), 0, 0, 0, 0, swpFlags);
-            }
+            PInvoke.SetWindowPos(new(m_nonHitTestableHwnd), new(new IntPtr(-1)), 0, 0, 0, 0, swpFlags);
+            PInvoke.SetWindowPos(new(m_hwnd), new(new IntPtr(-1)), 0, 0, 0, 0, swpFlags);
         }
 
         public void SetResource(string key, object? value)

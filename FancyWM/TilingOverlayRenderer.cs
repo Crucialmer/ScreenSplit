@@ -77,6 +77,20 @@ namespace FancyWM
             }
         }
 
+        private string? m_previewTitle;
+        public string? PreviewTitle
+        {
+            get => m_previewTitle;
+            set
+            {
+                if (m_previewTitle != value)
+                {
+                    m_previewTitle = value;
+                    m_viewModel.PreviewTitle = value;
+                }
+            }
+        }
+
         public IWindow? IntentSourceWindow
         {
             get => m_intentSourceWindow;
@@ -364,6 +378,10 @@ namespace FancyWM
         private void OnSetPreviewRectangle(Rectangle? oldValue, Rectangle? newValue)
         {
             m_viewModel.PreviewRectangle = newValue.HasValue ? AdjustForDisplay(newValue.Value) : new Rectangle();
+            if (!newValue.HasValue)
+            {
+                m_viewModel.PreviewTitle = null;
+            }
         }
 
 

@@ -40,47 +40,37 @@
             </Rectangle.Style>
         </Rectangle>
 
-        <Rectangle
-            Stroke="{theme:CssResource panel.preview/border-color}"
-            StrokeThickness="{theme:CssResource panel.preview/border-width}"
-            RadiusX="{theme:CssResource panel.preview/border-radius}"
-            RadiusY="{theme:CssResource panel.preview/border-radius}"
-            Fill="{theme:CssResource panel.preview/background}"
+        <Border
+            BorderBrush="{theme:CssResource panel.preview/border-color}"
+            BorderThickness="{theme:CssResource panel.preview/border-width}"
+            CornerRadius="{theme:CssResource panel.preview/border-radius}"
+            Background="{theme:CssResource panel.preview/background}"
             Effect="{theme:CssResource panel.preview/filter}"
-            Opacity="0"
             Width="{Binding PreviewRectangle.Width}"
             Height="{Binding PreviewRectangle.Height}"
             Canvas.Left="{Binding PreviewRectangle.Left}"
             Canvas.Top="{Binding PreviewRectangle.Top}">
-            <Rectangle.Style>
-                <Style>
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed" />
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding Path=IsPreviewRectangleVisible}" Value="True">
-                            <DataTrigger.EnterActions>
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.1" />
-                                        <ObjectAnimationUsingKeyFrames BeginTime="00:00:00" Storyboard.TargetProperty="(UIElement.Visibility)">
-                                            <DiscreteObjectKeyFrame KeyTime="00:00:00" Value="{x:Static Visibility.Visible}"/>
-                                        </ObjectAnimationUsingKeyFrames>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </DataTrigger.EnterActions>
-                            <DataTrigger.ExitActions>
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.1" />
-                                        <ObjectAnimationUsingKeyFrames BeginTime="0:0:0.1" Storyboard.TargetProperty="(UIElement.Visibility)">
-                                            <DiscreteObjectKeyFrame KeyTime="00:00:00" Value="{x:Static Visibility.Collapsed}"/>
-                                        </ObjectAnimationUsingKeyFrames>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </DataTrigger.ExitActions>
+                            <Setter Property="Visibility" Value="Visible" />
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>
-            </Rectangle.Style>
-        </Rectangle>
+            </Border.Style>
+            <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Border Background="#66000000" CornerRadius="8" Padding="12,6"
+                        BorderBrush="{theme:CssResource panel.preview/border-color}" BorderThickness="1.2"
+                        Visibility="{Binding PreviewTitleVisibility}">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="&#xE777;" FontFamily="Segoe MDL2 Assets" Foreground="White" FontSize="13" VerticalAlignment="Center" Margin="0,0,6,0" />
+                        <TextBlock Text="{Binding PreviewTitle}" Foreground="White" FontSize="12.5" FontWeight="Medium" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
 
         <ItemsControl ItemsSource="{Binding Path=WindowElements}">
             <ItemsControl.ItemTemplate>

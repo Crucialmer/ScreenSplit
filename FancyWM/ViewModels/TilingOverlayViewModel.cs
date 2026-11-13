@@ -37,5 +37,11 @@ namespace FancyWM.ViewModels
 
         [DerivedProperty(nameof(PreviewRectangle))]
         public bool IsPreviewRectangleVisible => m_previewRectangle.Width != 0;
+
+        private string? m_previewTitle;
+        public string? PreviewTitle { get => m_previewTitle; set => SetField(ref m_previewTitle, value); }
+
+        [DerivedProperty(nameof(PreviewTitle))]
+        public Visibility PreviewTitleVisibility => !string.IsNullOrEmpty(m_previewTitle) ? Visibility.Visible : Visibility.Collapsed;
     }
 }
