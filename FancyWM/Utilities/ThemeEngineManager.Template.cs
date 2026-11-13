@@ -34,7 +34,7 @@ namespace FancyWM.Utilities
             var isRounded = Environment.OSVersion.Version.Build >= 22000;
 
             var previewBorderColor = accentLight2;
-            var previewRectangleFill = accentLight1.WithOpacity(0.22);
+            var previewRectangleFill = accentLight1.WithOpacity(0.26);
             var panelBarBackground = isDarkTheme ? Color.FromRgb(0x1F, 0x1F, 0x1F) : Color.FromRgb(0xCD, 0xCD, 0xCD);
             var panelBarButtonBackground = isDarkTheme ? accentLight2 : accentDark1;
             var panelBarBorder = isDarkTheme ? Color.FromArgb(0x19, 0, 0, 0) : Color.FromArgb(0x19, 255, 255, 255);

@@ -13,6 +13,7 @@ using System.Windows.Input;
 using Microsoft.Extensions.DependencyInjection;
 using System.Reactive.Linq;
 using System.Diagnostics;
+using FancyWM.DllImports;
 
 namespace FancyWM
 {
@@ -477,18 +478,20 @@ namespace FancyWM
             }
         }
 
-        private (Rectangle? Rect, string? Title) GetPreviewInfo()
+        private (Rectangle? Rect, string? Title) GetPreviewInfo() => GetPreviewInfo(m_workspace.CursorLocation);
+
+        private (Rectangle? Rect, string? Title) GetPreviewInfo(Point pt)
         {
             if (m_currentInteraction == UserInteraction.Moving || m_movingWindow != null || m_movingPanelNode != null)
             {
                 try
                 {
-                    var pt = m_workspace.CursorLocation;
                     if (m_display.Bounds.Contains(pt))
                     {
+                        var wa = m_display.WorkArea;
                         if (m_movingPanelNode == null)
                         {
-                            var snapZone = GetSnapZone(pt, m_display.WorkArea);
+                            var snapZone = GetSnapZone(pt, wa);
                             if (snapZone != ScreenSnapZone.None)
                             {
                                 string snapTitle = snapZone switch
@@ -503,72 +506,42 @@ namespace FancyWM
                                     ScreenSnapZone.BottomRightQuarter => "停靠右下角",
                                     _ => "边缘停靠"
                                 };
-                                return (GetSnapRectangle(snapZone, m_display.WorkArea), snapTitle);
+                                return (GetSnapRectangle(snapZone, wa), snapTitle);
                             }
 
-                            // 方案二：如果窗口是从边缘/角落拖出，在自由区展示半透明原始尺寸轮廓跟随光标，方便自由放置
+                            // 自由区：展示原始尺寸阴影色跟随光标，方便自由放置
                             if (m_movingWindow != null)
                             {
-                                Rectangle preSnapRect = default;
-                                bool hasPreSnap = false;
-                                using (m_preSnapRectanglesLock.EnterScope())
+                                int targetW = m_currentDragTargetSize.X;
+                                int targetH = m_currentDragTargetSize.Y;
+
+                                if (targetW <= 0 || targetH <= 0 || (targetW >= wa.Width && targetH >= wa.Height))
                                 {
-                                    hasPreSnap = m_preSnapRectangles.TryGetValue(m_movingWindow, out preSnapRect);
+                                    targetW = (int)(wa.Width * 0.60);
+                                    targetH = (int)(wa.Height * 0.65);
                                 }
+                                targetW = Math.Clamp(targetW, 400, (int)(wa.Width * 0.95));
+                                targetH = Math.Clamp(targetH, 300, (int)(wa.Height * 0.95));
 
-                                var wa = m_display.WorkArea;
-                                if (!hasPreSnap || preSnapRect.Width <= 0 || preSnapRect.Height <= 0)
-                                {
-                                    var curPos = m_movingWindow.Position;
-                                    if (IsWindowSnapped(curPos, wa))
-                                    {
-                                        int defaultW = (int)(wa.Width * 0.60);
-                                        int defaultH = (int)(wa.Height * 0.65);
-                                        preSnapRect = Rectangle.OffsetAndSize(
-                                            wa.Left + (wa.Width - defaultW) / 2,
-                                            wa.Top + (wa.Height - defaultH) / 2,
-                                            defaultW, defaultH);
-                                        hasPreSnap = true;
-                                        using (m_preSnapRectanglesLock.EnterScope())
-                                        {
-                                            m_preSnapRectangles[m_movingWindow] = preSnapRect;
-                                        }
-                                    }
-                                }
+                                int targetX = pt.X - (int)(targetW * m_dragGrabRatioX);
+                                int targetY = pt.Y - 20;
 
-                                if (hasPreSnap && preSnapRect.Width > 0 && preSnapRect.Height > 0)
-                                {
-                                    int targetW = preSnapRect.Width;
-                                    int targetH = preSnapRect.Height;
+                                if (targetX < wa.Left) targetX = wa.Left;
+                                if (targetX + targetW > wa.Right) targetX = wa.Right - targetW;
+                                if (targetY < wa.Top) targetY = wa.Top;
+                                if (targetY + targetH > wa.Bottom) targetY = wa.Bottom - targetH;
 
-                                    if (targetW >= wa.Width && targetH >= wa.Height)
-                                    {
-                                        targetW = (int)(wa.Width * 0.60);
-                                        targetH = (int)(wa.Height * 0.65);
-                                    }
-                                    targetW = Math.Clamp(targetW, 400, (int)(wa.Width * 0.95));
-                                    targetH = Math.Clamp(targetH, 300, (int)(wa.Height * 0.95));
-
-                                    int targetX = pt.X - (int)(targetW * m_dragGrabRatioX);
-                                    int targetY = pt.Y - 15;
-
-                                    if (targetX < wa.Left) targetX = wa.Left;
-                                    if (targetX + targetW > wa.Right) targetX = wa.Right - targetW;
-                                    if (targetY < wa.Top) targetY = wa.Top;
-                                    if (targetY + targetH > wa.Bottom) targetY = wa.Bottom - targetH;
-
-                                    return (Rectangle.OffsetAndSize(targetX, targetY, targetW, targetH), "还原原始尺寸");
-                                }
+                                string title = m_isDraggingSnappedWindow ? "还原原始尺寸" : "自由放置";
+                                return (Rectangle.OffsetAndSize(targetX, targetY, targetW, targetH), title);
                             }
                         }
 
                         if (m_movingPanelNode != null)
                         {
-                            var wa = m_display.WorkArea;
                             int defaultW = (int)(wa.Width * 0.60);
                             int defaultH = (int)(wa.Height * 0.65);
                             int targetX = Math.Clamp(pt.X - defaultW / 2, wa.Left, wa.Right - defaultW);
-                            int targetY = Math.Clamp(pt.Y - 15, wa.Top, wa.Bottom - defaultH);
+                            int targetY = Math.Clamp(pt.Y - 20, wa.Top, wa.Bottom - defaultH);
                             return (Rectangle.OffsetAndSize(targetX, targetY, defaultW, defaultH), null);
                         }
 
@@ -581,6 +554,41 @@ namespace FancyWM
                 }
             }
             return (null, null);
+        }
+
+        private void UpdateDragPreview(Point pt)
+        {
+            var preview = GetPreviewInfo(pt);
+            SetPreviewRectangle(preview.Rect, preview.Title);
+            m_gui.EnsureTopmost();
+        }
+
+        private void OnDragTrackingTimerTick(object? sender, EventArgs e)
+        {
+            if (!m_active || m_movingWindow == null)
+            {
+                m_dragTrackingTimer.Stop();
+                return;
+            }
+
+            var pt = m_workspace.CursorLocation;
+
+            // 实时检测鼠标左键是否松开（通过直接检测物理按键状态）
+            if ((PInvoke.GetAsyncKeyState(1) & 0x8000) == 0)
+            {
+                m_dragTrackingTimer.Stop();
+                if (m_movingWindow != null)
+                {
+                    var win = m_movingWindow;
+                    m_movingWindow = null;
+                    m_currentInteraction = UserInteraction.None;
+                    SetPreviewRectangle(null, null);
+                    DoWindowMove(win);
+                }
+                return;
+            }
+
+            UpdateDragPreview(pt);
         }
 
         private void MoveToParentPanel(TilingNode node)
@@ -791,8 +799,7 @@ namespace FancyWM
         {
             if (m_currentInteraction == UserInteraction.Moving || m_movingWindow != null)
             {
-                var preview = GetPreviewInfo();
-                SetPreviewRectangle(preview.Rect, preview.Title);
+                UpdateDragPreview(e.NewLocation);
             }
 
             if (PendingIntent == null)
@@ -1419,19 +1426,15 @@ namespace FancyWM
                 m_activeDragOriginalRect.Remove(window);
             }
 
-            if (!hadPreSnap)
+            if (!hadPreSnap && m_isDraggingSnappedWindow)
             {
-                var curPos = window.Position;
-                if (IsWindowSnapped(curPos, wa))
-                {
-                    int defaultW = (int)(wa.Width * 0.60);
-                    int defaultH = (int)(wa.Height * 0.65);
-                    preSnapRect = Rectangle.OffsetAndSize(
-                        wa.Left + (wa.Width - defaultW) / 2,
-                        wa.Top + (wa.Height - defaultH) / 2,
-                        defaultW, defaultH);
-                    hadPreSnap = true;
-                }
+                int defaultW = (int)(wa.Width * 0.60);
+                int defaultH = (int)(wa.Height * 0.65);
+                preSnapRect = Rectangle.OffsetAndSize(
+                    wa.Left + (wa.Width - defaultW) / 2,
+                    wa.Top + (wa.Height - defaultH) / 2,
+                    defaultW, defaultH);
+                hadPreSnap = true;
             }
 
             if (hadPreSnap && preSnapRect.Width > 0 && preSnapRect.Height > 0)
@@ -1451,7 +1454,7 @@ namespace FancyWM
                 targetH = Math.Clamp(targetH, 300, (int)(wa.Height * 0.95));
 
                 int targetX = pt.X - (int)(targetW * m_dragGrabRatioX);
-                int targetY = pt.Y - 15;
+                int targetY = pt.Y - 20;
 
                 if (targetX < wa.Left) targetX = wa.Left;
                 if (targetX + targetW > wa.Right) targetX = wa.Right - targetW;
@@ -1483,26 +1486,33 @@ namespace FancyWM
             if (!m_active)
                 return;
 
-            m_movingWindow = null;
-            m_isDraggingTitleBar = false;
+            m_dragTrackingTimer.Stop();
             SetPreviewRectangle(null, null);
 
-            if (m_currentInteraction == UserInteraction.Moving || CanManage(e.Source, ignoreFloating: true))
+            var win = m_movingWindow ?? e.Source;
+            m_movingWindow = null;
+            m_isDraggingTitleBar = false;
+
+            if (m_currentInteraction == UserInteraction.Moving || CanManage(win, ignoreFloating: true))
             {
                 try
                 {
-                    DoWindowMove(e.Source);
+                    DoWindowMove(win);
                 }
                 catch (InvalidWindowReferenceException)
                 {
                 }
                 catch (TilingFailedException ex)
                 {
-                    PlacementFailed?.Invoke(this, new TilingFailedEventArgs(ex.FailReason, e.Source));
+                    PlacementFailed?.Invoke(this, new TilingFailedEventArgs(ex.FailReason, win));
                 }
                 catch (Exception ex)
                 {
-                    m_logger.Warning(ex, "Error handling window move end for {Window}", e.Source.DebugString());
+                    m_logger.Warning(ex, "Error handling window move end for {Window}", win.DebugString());
+                }
+                finally
+                {
+                    m_currentInteraction = UserInteraction.None;
                 }
             }
 
@@ -1560,6 +1570,8 @@ namespace FancyWM
                 else
                 {
                     m_currentInteraction = UserInteraction.Resizing;
+                    m_dragTrackingTimer.Stop();
+                    SetPreviewRectangle(null, null);
                     using (m_preSnapRectanglesLock.EnterScope())
                     {
                         m_preSnapRectangles.Remove(e.Source);
@@ -1579,8 +1591,7 @@ namespace FancyWM
 
                 if (m_currentInteraction == UserInteraction.Moving || m_movingWindow != null)
                 {
-                    var preview = GetPreviewInfo();
-                    SetPreviewRectangle(preview.Rect, preview.Title);
+                    UpdateDragPreview(m_workspace.CursorLocation);
                 }
                 else
                 {
@@ -1834,7 +1845,6 @@ namespace FancyWM
             {
                 m_ignoreRepositionSet.Add(e.Source);
             }
-            m_currentInteraction = UserInteraction.Starting;
             m_movingWindow = e.Source;
 
             var cursor = m_workspace.CursorLocation;
@@ -1848,17 +1858,52 @@ namespace FancyWM
                 m_dragGrabRatioX = 0.5;
             }
 
-            m_isDraggingTitleBar = (cursor.Y >= startPos.Top - 15 && cursor.Y <= startPos.Top + 65 &&
-                                    cursor.X >= startPos.Left - 10 && cursor.X <= startPos.Right + 10);
-
             var wa = m_display.WorkArea;
-            if (!IsWindowSnapped(startPos, wa))
+            bool wasSnapped = IsWindowSnapped(startPos, wa);
+            Rectangle preSnapRect = default;
+            bool hasPreSnap = false;
+
+            using (m_preSnapRectanglesLock.EnterScope())
             {
+                hasPreSnap = m_preSnapRectangles.TryGetValue(e.Source, out preSnapRect);
+            }
+
+            if (wasSnapped)
+            {
+                m_isDraggingSnappedWindow = true;
+                if (!hasPreSnap || preSnapRect.Width <= 0 || preSnapRect.Height <= 0)
+                {
+                    int defaultW = (int)(wa.Width * 0.60);
+                    int defaultH = (int)(wa.Height * 0.65);
+                    preSnapRect = Rectangle.OffsetAndSize(
+                        wa.Left + (wa.Width - defaultW) / 2,
+                        wa.Top + (wa.Height - defaultH) / 2,
+                        defaultW, defaultH);
+                    using (m_preSnapRectanglesLock.EnterScope())
+                    {
+                        m_preSnapRectangles[e.Source] = preSnapRect;
+                    }
+                }
+                m_currentDragTargetSize = new WinMan.Point(preSnapRect.Width, preSnapRect.Height);
+            }
+            else
+            {
+                m_isDraggingSnappedWindow = false;
                 using (m_preSnapRectanglesLock.EnterScope())
                 {
                     m_activeDragOriginalRect[e.Source] = startPos;
                 }
+                m_currentDragTargetSize = new WinMan.Point(startPos.Width, startPos.Height);
             }
+
+            int topHeaderHeight = Math.Max(100, (int)(startPos.Height * 0.35));
+            bool inTitleBarArea = cursor.Y >= startPos.Top - 25 && cursor.Y <= startPos.Top + topHeaderHeight &&
+                                  cursor.X >= startPos.Left - 15 && cursor.X <= startPos.Right + 15;
+            m_isDraggingTitleBar = wasSnapped || inTitleBarArea;
+            m_currentInteraction = m_isDraggingTitleBar ? UserInteraction.Moving : UserInteraction.Starting;
+
+            m_dragTrackingTimer.Start();
+            UpdateDragPreview(cursor);
         }
 
         private void OnTilingNodeFocusRequested(object? sender, TilingNode e)

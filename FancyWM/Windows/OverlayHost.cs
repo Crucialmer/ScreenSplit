@@ -104,13 +104,16 @@ namespace FancyWM.Windows
             // Set an owner relationship so that m_hwnd is always rendered on top of m_nonHitTestableHwnd.
             _ = SetWindowLongPtr(new(m_hwnd), GetWindowLongPtr_nIndex.GWLP_HWNDPARENT, m_nonHitTestableHwnd);
 
+            var hitExStyle = (WINDOWS_EX_STYLE)PInvoke.GetWindowLong(new(m_hwnd), GetWindowLongPtr_nIndex.GWL_EXSTYLE);
             _ = SetWindowLongPtr(new(m_hwnd), GetWindowLongPtr_nIndex.GWL_EXSTYLE,
-                (int)(WINDOWS_EX_STYLE.WS_EX_TOOLWINDOW | WINDOWS_EX_STYLE.WS_EX_NOACTIVATE | WINDOWS_EX_STYLE.WS_EX_TOPMOST));
+                (int)(hitExStyle | WINDOWS_EX_STYLE.WS_EX_TOOLWINDOW | WINDOWS_EX_STYLE.WS_EX_NOACTIVATE | WINDOWS_EX_STYLE.WS_EX_TOPMOST | WINDOWS_EX_STYLE.WS_EX_LAYERED));
+
+            var nonHitExStyle = (WINDOWS_EX_STYLE)PInvoke.GetWindowLong(new(m_nonHitTestableHwnd), GetWindowLongPtr_nIndex.GWL_EXSTYLE);
             _ = SetWindowLongPtr(new(m_nonHitTestableHwnd), GetWindowLongPtr_nIndex.GWL_EXSTYLE,
-                (int)(WINDOWS_EX_STYLE.WS_EX_TOOLWINDOW | WINDOWS_EX_STYLE.WS_EX_TRANSPARENT | WINDOWS_EX_STYLE.WS_EX_NOACTIVATE | WINDOWS_EX_STYLE.WS_EX_TOPMOST));
+                (int)(nonHitExStyle | WINDOWS_EX_STYLE.WS_EX_TOOLWINDOW | WINDOWS_EX_STYLE.WS_EX_TRANSPARENT | WINDOWS_EX_STYLE.WS_EX_NOACTIVATE | WINDOWS_EX_STYLE.WS_EX_TOPMOST | WINDOWS_EX_STYLE.WS_EX_LAYERED));
 
             DisableWindow(m_hwnd);
-            DisableWindow(m_nonHitTestableHwnd);
+            // Note: do not disable m_nonHitTestableHwnd with WS_DISABLED because that breaks DWM composition on transparent windows
             UpdatePositions();
 
             display.Workspace.CursorLocationChanged += OnCursorLocationChanged;
@@ -179,6 +182,12 @@ namespace FancyWM.Windows
             var swpFlags = SetWindowPos_uFlags.SWP_NOMOVE | SetWindowPos_uFlags.SWP_NOSIZE | SetWindowPos_uFlags.SWP_NOACTIVATE | SetWindowPos_uFlags.SWP_NOSENDCHANGING;
             PInvoke.SetWindowPos(new(m_nonHitTestableHwnd), new(new IntPtr(-1)), 0, 0, 0, 0, swpFlags);
             PInvoke.SetWindowPos(new(m_hwnd), new(new IntPtr(-1)), 0, 0, 0, 0, swpFlags);
+        }
+
+        public void EnsureTopmost()
+        {
+            var swpFlags = SetWindowPos_uFlags.SWP_NOMOVE | SetWindowPos_uFlags.SWP_NOSIZE | SetWindowPos_uFlags.SWP_NOACTIVATE | SetWindowPos_uFlags.SWP_NOSENDCHANGING;
+            PInvoke.SetWindowPos(new(m_nonHitTestableHwnd), new(new IntPtr(-1)), 0, 0, 0, 0, swpFlags);
         }
 
         public void SetResource(string key, object? value)

@@ -43,7 +43,7 @@
         <Border
             BorderBrush="{theme:CssResource panel.preview/border-color}"
             BorderThickness="{theme:CssResource panel.preview/border-width}"
-            CornerRadius="{theme:CssResource panel.preview/border-radius}"
+            CornerRadius="10"
             Background="{theme:CssResource panel.preview/background}"
             Effect="{theme:CssResource panel.preview/filter}"
             Width="{Binding PreviewRectangle.Width}"
@@ -60,13 +60,21 @@
                     </Style.Triggers>
                 </Style>
             </Border.Style>
-            <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
-                <Border Background="#66000000" CornerRadius="8" Padding="12,6"
+            <Grid>
+                <!-- Subtle dark shadow tint layer to clearly show original size state -->
+                <Border CornerRadius="8" Background="#24000000" Margin="1" />
+
+                <!-- Centered indicator badge -->
+                <Border HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Background="#D9181818" CornerRadius="14" Padding="14,7"
                         BorderBrush="{theme:CssResource panel.preview/border-color}" BorderThickness="1.2"
                         Visibility="{Binding PreviewTitleVisibility}">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="12" ShadowDepth="2" Direction="270" Color="#000000" Opacity="0.5" />
+                    </Border.Effect>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE777;" FontFamily="Segoe MDL2 Assets" Foreground="White" FontSize="13" VerticalAlignment="Center" Margin="0,0,6,0" />
-                        <TextBlock Text="{Binding PreviewTitle}" Foreground="White" FontSize="12.5" FontWeight="Medium" VerticalAlignment="Center" />
+                        <TextBlock Text="&#xE777;" FontFamily="Segoe MDL2 Assets" Foreground="White" FontSize="13" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <TextBlock Text="{Binding PreviewTitle}" Foreground="White" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center" />
                     </StackPanel>
                 </Border>
             </Grid>

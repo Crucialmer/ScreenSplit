@@ -314,6 +314,11 @@ namespace FancyWM
             m_overlay.Show();
         }
 
+        internal void EnsureTopmost()
+        {
+            m_overlay.EnsureTopmost();
+        }
+
         internal void Hide()
         {
             m_overlay.Hide();

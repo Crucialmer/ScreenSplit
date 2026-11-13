@@ -176,6 +176,9 @@ namespace FancyWM
         private double m_dragGrabRatioX = 0.5;
         private IWindow? m_movingWindow;
         private bool m_isDraggingTitleBar = false;
+        private bool m_isDraggingSnappedWindow = false;
+        private WinMan.Point m_currentDragTargetSize = default;
+        private readonly DispatcherTimer m_dragTrackingTimer;
 
         private readonly CompositeDisposable m_subscriptions = [];
         private readonly IAnimationThread m_animationThread;
@@ -200,6 +203,10 @@ namespace FancyWM
             m_animationThread = animationThread;
             m_display = display;
             m_backend = new TilingWorkspace();
+            m_dragTrackingTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(16), DispatcherPriority.Render, OnDragTrackingTimerTick, m_dispatcher)
+            {
+                IsEnabled = false
+            };
             m_gui = new TilingOverlayRenderer(display, GetOverlayAnchor)
             {
                 PanelSpacing = GetPanelSpacing(),
@@ -588,6 +595,7 @@ namespace FancyWM
             m_logger.Information("No longer managing display {Display}", m_display);
 
             m_active = false;
+            m_dragTrackingTimer.Stop();
             m_subscriptions.Dispose();
 
             PlacementFailed = null;
