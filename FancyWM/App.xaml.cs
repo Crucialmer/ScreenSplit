@@ -120,6 +120,11 @@ namespace FancyWM
                 Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri($"/{asm};component/Themes/Fluent/Squared.xaml", UriKind.RelativeOrAbsolute) });
             }
             Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri($"/{asm};component/Themes/Fluent/Generic.xaml", UriKind.RelativeOrAbsolute) });
+
+            if (e.Args != null && (e.Args.Contains("--update") || e.Args.Contains("--check-updates")))
+            {
+                Dispatcher.BeginInvoke(() => FancyWM.Windows.UpdateWindow.ShowUpdateDialog(), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+            }
         }
 
         internal string GetRealPath(string path)

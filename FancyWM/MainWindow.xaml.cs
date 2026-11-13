@@ -633,6 +633,13 @@ namespace FancyWM
                 return;
             }
 
+            if (string.Equals(actionName, "CheckUpdates", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(actionName, "OpenUpdates", StringComparison.OrdinalIgnoreCase))
+            {
+                UpdateWindow.ShowUpdateDialog();
+                return;
+            }
+
             BindableAction action;
             try
             {
@@ -1527,46 +1534,10 @@ namespace FancyWM
             OpenSettings();
         }
 
-        private async void OnCheckUpdatesClick(object? sender, RoutedEventArgs e)
+        private void OnCheckUpdatesClick(object? sender, RoutedEventArgs e)
         {
             m_contextMenu.IsOpen = false;
-            try
-            {
-                if (App.Current.Services.GetService<ReleaseChecker>() is ReleaseChecker releaseChecker)
-                {
-                    var latestVersion = await releaseChecker.GetLatestStableVersionAsync("Crucialmer", "ScreenSplit");
-                    var currentVersion = new Version(App.Current.VersionString);
-                    if (latestVersion != null && latestVersion > currentVersion)
-                    {
-                        var result = System.Windows.MessageBox.Show(
-                            $"发现新版本: v{latestVersion}\n当前版本: v{currentVersion}\n\n是否前往 GitHub Release 查看并下载最新版？",
-                            "ScreenSplit 检查更新",
-                            MessageBoxButton.YesNo,
-                            MessageBoxImage.Information);
-                        if (result == MessageBoxResult.Yes)
-                        {
-                            _ = global::Windows.System.Launcher.LaunchUriAsync(new Uri("https://github.com/Crucialmer/ScreenSplit/releases"));
-                        }
-                    }
-                    else
-                    {
-                        System.Windows.MessageBox.Show(
-                            $"当前已是最新版本 (v{currentVersion})，无需更新。",
-                            "ScreenSplit 检查更新",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Information);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                m_logger.Error(ex, "Manual update check failed!");
-                System.Windows.MessageBox.Show(
-                    $"检查更新失败，请稍后重试或检查网络连接。\n错误信息: {ex.Message}",
-                    "ScreenSplit 检查更新",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-            }
+            UpdateWindow.ShowUpdateDialog();
         }
 
         private async void OnRestoreSystemSnapClick(object? sender, RoutedEventArgs e)

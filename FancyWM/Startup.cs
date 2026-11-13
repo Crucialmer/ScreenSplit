@@ -91,6 +91,19 @@ Type 'ScreenSplit --help' from anywhere after installation.
                 return 0;
             }
 
+            if (args.Contains("--update") || args.Contains("--check-updates"))
+            {
+                try
+                {
+                    SendMessage("CheckUpdates");
+                    return 0;
+                }
+                catch
+                {
+                    // No instance running, will boot up and open dialog
+                }
+            }
+
             if (args.Contains("--version"))
             {
                 Console.WriteLine(GetFullVersionString());
