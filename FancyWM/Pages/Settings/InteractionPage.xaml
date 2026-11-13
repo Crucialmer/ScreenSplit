@@ -23,7 +23,7 @@
                         <CheckBox DockPanel.Dock="Right" IsChecked="{Binding Path=AutoFloatNewWindows, Mode=TwoWay}" />
                         <TextBlock VerticalAlignment="Center" Text="新打开窗口默认保持浮动（不自动分屏）" FontWeight="Medium" Margin="0,0,16,0" />
                     </DockPanel>
-                    <TextBlock TextWrapping="WrapWithOverflow" Padding="0,12,0,0" VerticalAlignment="Center" Text="默认开启。新窗口打开时不会被强制放入切分区打乱现有分屏。你可以按住 Shift + 鼠标左键将窗口拖放进切分区，或使用 Win + Shift + F 随时加入分屏。" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" />
+                    <TextBlock TextWrapping="WrapWithOverflow" Padding="0,12,0,0" VerticalAlignment="Center" Text="默认开启。新窗口打开时不会被强制放入切分区打乱现有分屏。你可以按住 Shift + 鼠标左键将窗口拖放进切分区，或直接拖拽至屏幕四周/四角进行智能停靠。" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" />
                 </StackPanel>
             </Border>
             <Border Style="{DynamicResource SettingsItemStyle}">

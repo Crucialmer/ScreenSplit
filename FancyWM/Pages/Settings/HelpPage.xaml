@@ -10,7 +10,7 @@
              xmlns:viewmodels="clr-namespace:FancyWM.ViewModels"
              d:DataContext="{d:DesignInstance Type=viewmodels:SettingsViewModel}"
              mc:Ignorable="d"
-             d:DesignHeight="600" d:DesignWidth="800">
+             d:DesignHeight="700" d:DesignWidth="800">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" MaxWidth="900"/>
@@ -32,80 +32,58 @@
                     </Border>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="ScreenSplit 便携分屏使用指南" FontWeight="SemiBold" FontSize="18" Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}" />
-                        <TextBlock Text="极简 · 高效 · 纯绿色运行 · 无任何干扰性菜单栏" FontSize="12.5" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,4,0,0" />
+                        <TextBlock Text="纯鼠标直觉交互 · 边缘智能吸附 · 零多余按键 · 极致轻盈" FontSize="12.5" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,4,0,0" />
                     </StackPanel>
                 </StackPanel>
             </Border>
 
-            <!-- Shortcuts Card Section -->
-            <TextBlock Text="常用分屏快捷键" Style="{DynamicResource SubtitleTextBlockStyle}" Margin="2,12,0,4" />
+            <!-- Edge & Corner Snapping Card -->
+            <TextBlock Text="边缘与角落智能停靠（纯鼠标拖拽）" Style="{DynamicResource SubtitleTextBlockStyle}" Margin="2,12,0,4" />
             <Border Style="{DynamicResource SettingsItemStyle}">
                 <ui:SimpleStackPanel Spacing="12">
-                    <!-- Shift + Win hint -->
                     <DockPanel LastChildFill="True">
-                        <TextBlock Text="激活前缀组合键" FontWeight="Medium" VerticalAlignment="Center" />
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                            <Border Background="{DynamicResource SystemControlBackgroundAltHighBrush}" CornerRadius="5" Padding="7,3" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="1" Margin="0,0,4,0">
-                                <TextBlock Text="Shift" FontWeight="SemiBold" FontSize="12" />
-                            </Border>
-                            <TextBlock Text="+" VerticalAlignment="Center" Margin="2,0" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" />
-                            <Border Background="{DynamicResource SystemControlBackgroundAltHighBrush}" CornerRadius="5" Padding="7,3" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="1">
-                                <TextBlock Text="⊞ Win" FontWeight="SemiBold" FontSize="12" />
-                            </Border>
+                        <Border Background="#007AFF" CornerRadius="6" Width="26" Height="26" Margin="0,0,12,0">
+                            <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE737;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="四周边缘停靠（二分之一分屏）" FontWeight="Medium" FontSize="13.5" />
+                            <TextBlock Text="拖拽窗口至屏幕左、右、上、下任意边缘，即刻触发半透明高亮预览；松开鼠标窗口自动精准占用对应半屏（左半屏、右半屏、上半屏、下半屏）。" TextWrapping="Wrap" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,3,0,0" />
                         </StackPanel>
                     </DockPanel>
 
                     <Rectangle Height="1" Fill="{DynamicResource SystemControlForegroundBaseLowBrush}" Opacity="0.3" />
 
-                    <!-- H -->
                     <DockPanel LastChildFill="True">
-                        <TextBlock Text="水平切分（左右平铺当前窗口）" VerticalAlignment="Center" />
-                        <Border Background="{DynamicResource SystemControlBackgroundAltHighBrush}" CornerRadius="5" Padding="8,3" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="1" HorizontalAlignment="Right">
-                            <TextBlock Text="H" FontWeight="SemiBold" FontSize="12" />
+                        <Border Background="#34C759" CornerRadius="6" Width="26" Height="26" Margin="0,0,12,0">
+                            <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE784;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="四角精细停靠（四分之一分屏）" FontWeight="Medium" FontSize="13.5" />
+                            <TextBlock Text="拖拽窗口至屏幕左上角、右上角、左下角、右下角任意角落，松开鼠标窗口自动占用屏幕的四分之一，多任务并排更省心。" TextWrapping="Wrap" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,3,0,0" />
+                        </StackPanel>
                     </DockPanel>
 
-                    <!-- V -->
-                    <DockPanel LastChildFill="True">
-                        <TextBlock Text="垂直切分（上下平铺当前窗口）" VerticalAlignment="Center" />
-                        <Border Background="{DynamicResource SystemControlBackgroundAltHighBrush}" CornerRadius="5" Padding="8,3" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="1" HorizontalAlignment="Right">
-                            <TextBlock Text="V" FontWeight="SemiBold" FontSize="12" />
-                        </Border>
-                    </DockPanel>
+                    <Rectangle Height="1" Fill="{DynamicResource SystemControlForegroundBaseLowBrush}" Opacity="0.3" />
 
-                    <!-- S -->
                     <DockPanel LastChildFill="True">
-                        <TextBlock Text="堆叠切分（标签页堆叠模式）" VerticalAlignment="Center" />
-                        <Border Background="{DynamicResource SystemControlBackgroundAltHighBrush}" CornerRadius="5" Padding="8,3" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="1" HorizontalAlignment="Right">
-                            <TextBlock Text="S" FontWeight="SemiBold" FontSize="12" />
+                        <Border Background="#FF9500" CornerRadius="6" Width="26" Height="26" Margin="0,0,12,0">
+                            <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE777;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
-                    </DockPanel>
-
-                    <!-- F -->
-                    <DockPanel LastChildFill="True">
-                        <TextBlock Text="切换浮动模式 / 平铺模式" VerticalAlignment="Center" />
-                        <Border Background="{DynamicResource SystemControlBackgroundAltHighBrush}" CornerRadius="5" Padding="8,3" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="1" HorizontalAlignment="Right">
-                            <TextBlock Text="F" FontWeight="SemiBold" FontSize="12" />
-                        </Border>
-                    </DockPanel>
-
-                    <!-- F11 -->
-                    <DockPanel LastChildFill="True">
-                        <TextBlock Text="全局暂停 / 恢复平铺管理" VerticalAlignment="Center" />
-                        <Border Background="{DynamicResource SystemControlBackgroundAltHighBrush}" CornerRadius="5" Padding="8,3" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="1" HorizontalAlignment="Right">
-                            <TextBlock Text="F11" FontWeight="SemiBold" FontSize="12" />
-                        </Border>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="拖离边缘自动还原原始尺寸" FontWeight="Medium" FontSize="13.5" />
+                            <TextBlock Text="按住标题栏将已停靠边缘的窗口拖离边缘至屏幕任意区域，松开时窗口立即自动还原为停靠前的原始尺寸与状态，无缝衔接日常使用。" TextWrapping="Wrap" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,3,0,0" />
+                        </StackPanel>
                     </DockPanel>
                 </ui:SimpleStackPanel>
             </Border>
 
-            <!-- Mouse Gestures -->
-            <TextBlock Text="鼠标与分屏交互操作" Style="{DynamicResource SubtitleTextBlockStyle}" Margin="2,12,0,4" />
+            <!-- Tiling Partition & Floating Gestures -->
+            <TextBlock Text="切分区自由管理（灵活进出）" Style="{DynamicResource SubtitleTextBlockStyle}" Margin="2,12,0,4" />
             <Border Style="{DynamicResource SettingsItemStyle}">
-                <ui:SimpleStackPanel Spacing="8">
-                    <TextBlock Text="• 摆脱切分区（脱离分屏）：直接用鼠标按住标题栏拖动已分屏的窗口（无需按任何键），松开后该窗口即可摆脱切分区，恢复为自由浮动窗口！" TextWrapping="Wrap" FontWeight="Medium" />
-                    <TextBlock Text="• 放进切分区（加入分屏）：按住键盘 Shift 键，然后拖拽任意窗口到目标分屏区域松开，即可直接放进切分区中。" TextWrapping="Wrap" FontWeight="Medium" />
-                    <TextBlock Text="• 调整分屏比例：将鼠标悬停在各分屏区域之间的边框缝隙处，按住左键拖拽即可自由缩放各窗口的显示比例。" TextWrapping="Wrap" />
+                <ui:SimpleStackPanel Spacing="10">
+                    <TextBlock Text="• 摆脱切分区（恢复自由浮动）：直接用鼠标按住标题栏拖动已分屏的窗口（无需按任何键），松开后该窗口即可摆脱切分区，恢复为自由浮动窗口！" TextWrapping="Wrap" FontWeight="Medium" />
+                    <TextBlock Text="• 放进切分区（加入并排平铺）：按住键盘 Shift 键，然后拖拽任意窗口到目标分屏区域松开，即可直接放进切分区中。" TextWrapping="Wrap" FontWeight="Medium" />
+                    <TextBlock Text="• 自由缩放分屏比例：将鼠标悬停在各分屏区域之间的边框缝隙处，按住左键拖拽即可自由缩放各窗口的显示比例。" TextWrapping="Wrap" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" />
                 </ui:SimpleStackPanel>
             </Border>
 

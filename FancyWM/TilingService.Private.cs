@@ -1196,6 +1196,10 @@ namespace FancyWM
             {
                 m_savedLocations.Remove(e.Source);
             }
+            using (m_preSnapRectanglesLock.EnterScope())
+            {
+                m_preSnapRectangles.Remove(e.Source);
+            }
             using (m_ignoreRepositionSetLock.EnterScope())
             {
                 m_ignoreRepositionSet.Remove(e.Source);
@@ -1237,6 +1241,29 @@ namespace FancyWM
                     m_logger.Information("Snapping window {Window} to {Zone} rectangle {Rect}",
                         window.DebugString(), snapZone, targetRect.Value);
 
+                    // 记录停靠前的原始窗口状态（仅首次记录，避免在边缘间反复切换时丢失原始浮动大小）
+                    using (m_preSnapRectanglesLock.EnterScope())
+                    {
+                        if (!m_preSnapRectangles.ContainsKey(window))
+                        {
+                            var currentPos = window.Position;
+                            if (currentPos.Width > 0 && currentPos.Height > 0 &&
+                                (currentPos.Width < wa.Width * 0.95 || currentPos.Height < wa.Height * 0.95))
+                            {
+                                m_preSnapRectangles[window] = currentPos;
+                            }
+                            else
+                            {
+                                int defaultW = (int)(wa.Width * 0.65);
+                                int defaultH = (int)(wa.Height * 0.70);
+                                m_preSnapRectangles[window] = Rectangle.OffsetAndSize(
+                                    wa.Left + (wa.Width - defaultW) / 2,
+                                    wa.Top + (wa.Height - defaultH) / 2,
+                                    defaultW, defaultH);
+                            }
+                        }
+                    }
+
                     using (m_backendLock.EnterScope())
                     {
                         if (m_backend.HasWindow(window))
@@ -1253,6 +1280,46 @@ namespace FancyWM
                     InvalidateLayout();
                     return;
                 }
+            }
+
+            // 未落在停靠区：如果是从边缘拖离，自动恢复停靠前的原始窗口状态
+            bool hadPreSnap = false;
+            Rectangle preSnapRect = default;
+            using (m_preSnapRectanglesLock.EnterScope())
+            {
+                if (m_preSnapRectangles.TryGetValue(window, out preSnapRect))
+                {
+                    hadPreSnap = true;
+                    m_preSnapRectangles.Remove(window);
+                }
+            }
+
+            if (hadPreSnap && preSnapRect.Width > 0 && preSnapRect.Height > 0)
+            {
+                m_logger.Information("Window {Window} dragged away from edge/corner, restoring pre-snap rectangle {Rect}",
+                    window.DebugString(), preSnapRect);
+
+                int targetW = preSnapRect.Width;
+                int targetH = preSnapRect.Height;
+
+                if (targetW >= wa.Width && targetH >= wa.Height)
+                {
+                    targetW = (int)(wa.Width * 0.65);
+                    targetH = (int)(wa.Height * 0.70);
+                }
+                targetW = Math.Clamp(targetW, 400, (int)(wa.Width * 0.95));
+                targetH = Math.Clamp(targetH, 300, (int)(wa.Height * 0.95));
+
+                int targetX = pt.X - (int)(targetW * m_dragGrabRatioX);
+                int targetY = pt.Y - 15;
+
+                if (targetX < wa.Left) targetX = wa.Left;
+                if (targetX + targetW > wa.Right) targetX = wa.Right - targetW;
+                if (targetY < wa.Top) targetY = wa.Top;
+                if (targetY + targetH > wa.Bottom) targetY = wa.Bottom - targetH;
+
+                var restoredRect = Rectangle.OffsetAndSize(targetX, targetY, targetW, targetH);
+                ApplyWindowSnap(window, restoredRect);
             }
 
             // 未落在停靠区：拖出分屏后自由浮动
@@ -1345,6 +1412,10 @@ namespace FancyWM
                 else
                 {
                     m_currentInteraction = UserInteraction.Resizing;
+                    using (m_preSnapRectanglesLock.EnterScope())
+                    {
+                        m_preSnapRectangles.Remove(e.Source);
+                    }
                 }
             }
 
@@ -1614,6 +1685,16 @@ namespace FancyWM
                 m_ignoreRepositionSet.Add(e.Source);
             }
             m_currentInteraction = UserInteraction.Starting;
+
+            var cursor = m_workspace.CursorLocation;
+            if (e.OldPosition.Width > 0)
+            {
+                m_dragGrabRatioX = Math.Clamp((cursor.X - e.OldPosition.Left) / (double)e.OldPosition.Width, 0.1, 0.9);
+            }
+            else
+            {
+                m_dragGrabRatioX = 0.5;
+            }
         }
 
         private void OnTilingNodeFocusRequested(object? sender, TilingNode e)
