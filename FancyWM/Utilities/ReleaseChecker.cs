@@ -40,7 +40,12 @@ namespace FancyWM.Utilities
             CancellationToken cancellationToken = default)
         {
             var release = await GetLatestStableReleaseAsync(owner, repo, cancellationToken);
-            return release?.TagName != null ? new Version(release.TagName.TrimStart('v')) : null;
+            if (release?.TagName == null)
+            {
+                return null;
+            }
+            var cleanTag = release.TagName.TrimStart('v').Split('-')[0];
+            return Version.TryParse(cleanTag, out var version) ? version : null;
         }
 
         private async Task<GitHubRelease?> GetLatestStableReleaseAsync(
@@ -81,7 +86,8 @@ namespace FancyWM.Utilities
                     return release;
                 }
             }
-            return null;
+            // If all releases are prereleases (e.g. preview phase), return the newest one
+            return releases.Length > 0 ? releases[0] : null;
         }
 
         private static bool IsStableRelease(GitHubRelease release)
