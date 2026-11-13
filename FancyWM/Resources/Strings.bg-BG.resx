@@ -259,7 +259,7 @@
     <value>Превключване на управление на прозорци</value>
   </data>
   <data name="Keybinding.ToggleManager.Description" xml:space="preserve">
-    <value>Превключване на функцията за управление на прозорци на FancyWM</value>
+    <value>Превключване на функцията за управление на прозорци на ScreenSplit</value>
   </data>
   <data name="Keybinding.SwitchToDesktop1.Caption" xml:space="preserve">
     <value>Преминаване към работния плот 1</value>
@@ -397,10 +397,10 @@
     <value>Стартиране с привилегии на администратор</value>
   </data>
   <data name="General.RunsAsAdmin.AdminDescription" xml:space="preserve">
-    <value>FancyWM се изпълнява с привилегии на администратор и може управлява всичките ви прозорци.</value>
+    <value>ScreenSplit се изпълнява с привилегии на администратор и може управлява всичките ви прозорци.</value>
   </data>
   <data name="General.RunsAsAdmin.NonAdminDescription" xml:space="preserve">
-    <value>FancyWM не може управлява прозорци от повишени процеси, освен ако се стартира като администратор. Активирайте тази опция и рестартирайте FancyWM, за да поправите това.</value>
+    <value>ScreenSplit не може управлява прозорци от повишени процеси, освен ако се стартира като администратор. Активирайте тази опция и рестартирайте ScreenSplit, за да поправите това.</value>
   </data>
   <data name="General.RunsAtStartup" xml:space="preserve">
     <value>Автоматично стартиране при запуск на системата</value>
@@ -469,7 +469,7 @@
     <value>Генериране на начален скрипт</value>
   </data>
   <data name="Advanced.Scripting.Description" xml:space="preserve">
-    <value>Лесно разширяване на FancyWM с AutoHotkey - безплатен инструмент за прости Windows преки пътища. Не е необходимо програмиране: генерирайте готов за редакция скрипт с всички команди изброени като примери.</value>
+    <value>Лесно разширяване на ScreenSplit с AutoHotkey - безплатен инструмент за прости Windows преки пътища. Не е необходимо програмиране: генерирайте готов за редакция скрипт с всички команди изброени като примери.</value>
   </data>
   <data name="ContactTheDeveloper" xml:space="preserve">
     <value>свързване с разработчика</value>
@@ -478,13 +478,13 @@
     <value>Подробности</value>
   </data>
   <data name="General.MultiMonitorSupport.Description" xml:space="preserve">
-    <value>Рестартирайте FancyWM, за да се приложат промените!</value>
+    <value>Рестартирайте ScreenSplit, за да се приложат промените!</value>
   </data>
   <data name="ErrorMessageBox.Caption" xml:space="preserve">
-    <value>Възникна фатална грешка в FancyWM!</value>
+    <value>Възникна фатална грешка в ScreenSplit!</value>
   </data>
   <data name="ErrorMessageBox.Description.CheckForSolution" xml:space="preserve">
-    <value>FancyWM сега ще се затвори. Ако този проблем продължи, моля проверете за решение и/или отворете доклад за грешка на</value>
+    <value>ScreenSplit сега ще се затвори. Ако този проблем продължи, моля проверете за решение и/или отворете доклад за грешка на</value>
   </data>
   <data name="ErrorMessageBox.Description.SubmittingALog" xml:space="preserve">
     <value>Чрез предаване на дневник можете да помогнете за диагностицирането на проблема. Файлът на дневника съдържа история на събитията, водещи до срива. Чувствителната информация се замъглява.</value>
@@ -508,7 +508,7 @@
     <value>Регистрира клавишната комбинация като системен бърз клавиш, позволяващ й да бъде използвана без Активиращия бърз клавиш. Клавишната комбинация трябва да използва поне един модификатор (Ctrl, Shift, Alt, Win).</value>
   </data>
   <data name="Keybindings.DirectMode.FailModes" xml:space="preserve">
-    <value>Windows няма да позволи на FancyWM да регистрира бърз клавиш, който вече се използва от нея или друго приложение.</value>
+    <value>Windows няма да позволи на ScreenSplit да регистрира бърз клавиш, който вече се използва от нея или друго приложение.</value>
   </data>
   <data name="No" xml:space="preserve">
     <value>Не</value>
@@ -543,8 +543,8 @@
   <data name="Settings" xml:space="preserve">
     <value>Настройки</value>
   </data>
-  <data name="Settings.FancyWM" xml:space="preserve">
-    <value>Настройки на FancyWM</value>
+  <data name="Settings.ScreenSplit" xml:space="preserve">
+    <value>Настройки на ScreenSplit</value>
   </data>
   <data name="Yes" xml:space="preserve">
     <value>Да</value>
@@ -553,10 +553,10 @@
     <value>Моля, вижте</value>
   </data>
   <data name="Startup.Caption" xml:space="preserve">
-    <value>Стартиране на FancyWM</value>
+    <value>Стартиране на ScreenSplit</value>
   </data>
-  <data name="Startup.FancyWMIsRunning" xml:space="preserve">
-    <value>FancyWM сега работи!</value>
+  <data name="Startup.ScreenSplitIsRunning" xml:space="preserve">
+    <value>ScreenSplit сега работи!</value>
   </data>
   <data name="Startup.FirstTimeUsers" xml:space="preserve">
     <value>Първи път потребители:</value>
@@ -571,7 +571,7 @@
     <value>Можете също да преместите мишката над горната граница на фокусирания прозорец, за да промените оформлението.</value>
   </data>
   <data name="Startup.ShowThisWindow" xml:space="preserve">
-    <value>Показване на този прозорец при стартиране на FancyWM</value>
+    <value>Показване на този прозорец при стартиране на ScreenSplit</value>
   </data>
   <data name="AddNew" xml:space="preserve">
     <value>Добавяне на ново</value>
@@ -600,8 +600,8 @@
   <data name="Messages.DirectHotkeyRegistrationFailed" xml:space="preserve">
     <value>Не можа да се регистрира един или повече бързи клавиши като системни!</value>
   </data>
-  <data name="Messages.EnjoyingFancyWM" xml:space="preserve">
-    <value>Харесвате ли FancyWM?</value>
+  <data name="Messages.EnjoyingScreenSplit" xml:space="preserve">
+    <value>Харесвате ли ScreenSplit?</value>
   </data>
   <data name="Messages.FloatingModeEnabledFor" xml:space="preserve">
     <value>Режим на плаващ прозорец активиран за</value>
@@ -628,7 +628,7 @@
     <value>Получена невалидна команда</value>
   </data>
   <data name="Messages.StoreCommunicationFailed.Caption" xml:space="preserve">
-    <value>Грешка в FancyWM</value>
+    <value>Грешка в ScreenSplit</value>
   </data>
   <data name="Messages.StoreCommunicationFailed.Description" xml:space="preserve">
     <value>Комуникация с Microsoft Store е невъзможна с код</value>
@@ -637,13 +637,13 @@
     <value>Неразпозната клавишна комбинация!</value>
   </data>
   <data name="Messages.UpdateCheck.Caption" xml:space="preserve">
-    <value>Проверка за обновления на FancyWM</value>
+    <value>Проверка за обновления на ScreenSplit</value>
   </data>
   <data name="Messages.UpdateCheck.UpdateAvailable" xml:space="preserve">
-    <value>Налична е нова версия на FancyWM! Изтеглете последното обновление в заден план?</value>
+    <value>Налична е нова версия на ScreenSplit! Изтеглете последното обновление в заден план?</value>
   </data>
   <data name="Messages.UpdateCheck.UpdateDownloadComplete" xml:space="preserve">
-    <value>Изтеглянето на обновлението е завършено! Рестартирайте FancyWM, за да го инсталирате?</value>
+    <value>Изтеглянето на обновлението е завършено! Рестартирайте ScreenSplit, за да го инсталирате?</value>
   </data>
   <data name="Messages.WaitingForAction" xml:space="preserve">
     <value>Чакане на действие...</value>
@@ -675,8 +675,8 @@
   <data name="TilingError.TargetCannotFit" xml:space="preserve">
     <value>Не може да се побере в целевия панел!</value>
   </data>
-  <data name="ErrorMessageBox.RestartFancyWM" xml:space="preserve">
-    <value>Рестартиране на FancyWM</value>
+  <data name="ErrorMessageBox.RestartScreenSplit" xml:space="preserve">
+    <value>Рестартиране на ScreenSplit</value>
   </data>
   <data name="Overlay.Window.AddRuleForClass" xml:space="preserve">
     <value>Добавяне на правило за плаващ режим по клас на прозорец</value>
@@ -880,9 +880,9 @@
     <value>Вашата версия на Windows не се поддържа!</value>
   </data>
   <data name="Messages.WindowsVersionNotSupported.Description" xml:space="preserve">
-    <value>FancyWM се опитва да използва вътрешния Windows Virtual Desktop Service, който не се поддържа от Microsoft. Това съобщение може да бъде отключено в Настройки.
+    <value>ScreenSplit се опитва да използва вътрешния Windows Virtual Desktop Service, който не се поддържа от Microsoft. Това съобщение може да бъде отключено в Настройки.
 
-Изглежда, че във вашата версия на Windows, Microsoft е променила интерфейса на VDS, и FancyWM не може да открие вашите виртуални работни плотове.... Ако стартирате поддържана версия на Windows без Insider Build и видите това съобщение, моля изберете Да, за да го докладвате.</value>
+Изглежда, че във вашата версия на Windows, Microsoft е променила интерфейса на VDS, и ScreenSplit не може да открие вашите виртуални работни плотове.... Ако стартирате поддържана версия на Windows без Insider Build и видите това съобщение, моля изберете Да, за да го докладвате.</value>
   </data>
   <data name="Keybindings.DirectMode.Checkbox" xml:space="preserve">
     <value>Използване без Активиращия бърз клавиш?</value>
@@ -903,7 +903,7 @@
     <value>Показване на предупреждение при неуспех на Virtual Desktop Service</value>
   </data>
   <data name="General.NotifyVirtualDesktopServiceIncompatibility.Description" xml:space="preserve">
-    <value>FancyWM се опитва да използва вътрешния Windows Virtual Desktop Service, който не се поддържа от Microsoft. FancyWM може да ви предупреди, ако той е неподдържан на тази версия на Windows.</value>
+    <value>ScreenSplit се опитва да използва вътрешния Windows Virtual Desktop Service, който не се поддържа от Microsoft. ScreenSplit може да ви предупреди, ако той е неподдържан на тази версия на Windows.</value>
   </data>
   <data name="Keybindings.ActivateOnCapsLock.About" xml:space="preserve">
     <value>Не трябва да отпускате клавиша, за да активирате. ⇪ Caps Lock вече няма да функционира нормално</value>
@@ -918,7 +918,7 @@
     <value>Активира автоматично създаване на панелите, когато фокусираният панел има повече от указания брой дъщерни панели.</value>
   </data>
   <data name="About.FOSS" xml:space="preserve">
-    <value>FancyWM е безплатен и с отворен код, но изисква същото време и усилие, както всеки друг софтуер.</value>
+    <value>ScreenSplit е безплатен и с отворен код, но изисква същото време и усилие, както всеки друг софтуер.</value>
   </data>
   <data name="Interaction.DelayReposition" xml:space="preserve">
     <value>Отпускане на прозореца за преместване ᴺᴱᵂ</value>
@@ -960,7 +960,7 @@
     <value>Преместване на фокусирания прозорец от текущия виртуален работен плот към виртуалния работен плот вдясно</value>
   </data>
   <data name="About.AlreadyRunning" xml:space="preserve">
-    <value>Вече се изпълнява друга инстанция на FancyWM!</value>
+    <value>Вече се изпълнява друга инстанция на ScreenSplit!</value>
   </data>
   <data name="Interaction.MouseAutoFocus" xml:space="preserve">
     <value>Активиране на прозорците при посочване</value>

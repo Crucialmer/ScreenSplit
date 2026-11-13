@@ -103,17 +103,6 @@
                 </ListView.ItemTemplate>
             </ListView>
             <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch"  DockPanel.Dock="Bottom">
-                <TextBlock Opacity="0.8" FontSize="12" Margin="4" TextWrapping="Wrap">
-                    FancyWM is powered by you.
-                </TextBlock>
-                <Border CornerRadius="{StaticResource ControlCornerRadius}" Margin="4" Background="#3f51b5">
-                    <Button HorizontalAlignment="Stretch" TextBlock.FontWeight="Bold" TextBlock.Foreground="#ff80ab" Click="OnSponsorButtonClick">
-                        <StackPanel Orientation="Horizontal">
-                            <ui:FontIcon FontSize="14" FontFamily="Segoe MDL2 Assets" Glyph="&#xEB52;" Margin="0,0,8,0" />
-                            <TextBlock Text="Sponsor" />
-                        </StackPanel>
-                    </Button>
-                </Border>
                 <Button Margin="4" HorizontalAlignment="Stretch" DockPanel.Dock="Bottom" Click="OnQuitButtonClick" TextBlock.Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}">
                     <StackPanel Orientation="Horizontal">
                         <ui:FontIcon FontSize="14" FontFamily="Segoe MDL2 Assets" Glyph="&#xE7E8;" Margin="0,0,8,0" />

@@ -394,7 +394,7 @@ namespace FancyWM.ViewModels
         {
             var buckets = new[]
             {
-                ("FancyWM", new HashSet<BindableAction>{
+                ("ScreenSplit", new HashSet<BindableAction>{
                     BindableAction.ToggleManager,
                     BindableAction.ShowDesktop,
                     BindableAction.RefreshWorkspace,

@@ -1,182 +1,89 @@
-# FancyWM
+# ScreenSplit
 
-> "Sparked a Desktop Revolution" - [Seelen UI Blog](https://seelen.io/blog/the-seelen-ui-story) <!-- https://web.archive.org/web/20260113143128/https://seelen.io/blog/the-seelen-ui-story -->
+> 纯绿色便携运行 · 无菜单栏干扰 · Windows 动态平铺分屏工具
 
-> "Offers a lot of functions in a tiny, compact package" - [Softpedia](https://www.softpedia.com/get/Desktop-Enhancements/Other-Desktop-Enhancements/FancyWM.shtml) <!-- https://web.archive.org/web/20260130081735/https://www.softpedia.com/get/Desktop-Enhancements/Other-Desktop-Enhancements/FancyWM.shtml -->
+[![GitHub Release](https://img.shields.io/github/v/release/Crucialmer/ScreenSplit?style=flat-square)](https://github.com/Crucialmer/ScreenSplit/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 
-> "After you try FancyWM, you may feel like a supreme power user" - [MakeUseOf](https://www.makeuseof.com/windows-fancywm-guide/) <!-- https://web.archive.org/web/20260130081744/https://www.makeuseof.com/windows-fancywm-guide/ -->
+**ScreenSplit** 是专为 Windows 10 / Windows 11 设计的轻量级、全便携动态平铺窗口管理与自定义分屏工具。它基于 FancyWM 深度改造与优化，去除了所有干扰性的顶部浮动菜单栏，实现了 100% 绿色便携存储，让你的桌面窗口布局井然有序、高效无感。
 
-> "Once you get the hang of it, you'll see how efficient these things can be" - [ZDNET](https://www.zdnet.com/article/how-i-use-a-tiling-manager-to-make-my-windows-experience-more-efficient/) <!-- https://web.archive.org/web/20260130081754/https://www.zdnet.com/article/how-i-use-a-tiling-manager-to-make-my-windows-experience-more-efficient/ -->
+---
 
-> "Multi-tasking made easier" - [XDA Developers](https://www.xda-developers.com/tiling-window-managers-arent-just-linux-these-best-options-windows/) <!-- https://web.archive.org/web/20260130081806/https://www.xda-developers.com/tiling-window-managers-arent-just-linux-these-best-options-windows/ -->
+## 🌟 核心特性与改造优化
 
-[![Gitter](https://badges.gitter.im/FancyWM/community.svg)](https://gitter.im/FancyWM/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/FancyWM/fancywm)
+1. **纯绿色便携（100% Portable）**
+   - 不写入系统注册表，不在用户的 `%APPDATA%` 或其他系统路径产生残留。
+   - 软件所有配置数据（`Settings.json`）、日志文件（`Logs/`）统一存放在软件自身根目录的 `./Data/` 文件夹中，随拷随走。
 
-**FancyWM** is a dynamic tiling window manager for Windows 10/11 that brings the productivity of tiling windows to the Windows desktop - **without complex configuration** and without sacrificing the familiar **mouse-and-keyboard interactions** most users expect.
+2. **纯粹分屏，移除多余菜单栏（Zero Clutter）**
+   - 彻底移除了原版的顶部浮动菜单栏与多余的屏幕顶部边距占用（0 额外像素消耗）。
+   - 保留最纯粹的屏幕自定义平铺逻辑，完全融入 Windows 原生窗口体验。
 
-<img align="right" src="https://store-images.s-microsoft.com/image/apps.53415.14517052119257390.d950e654-2004-4878-b902-94902f8f7a45.af24879e-636a-494c-ba1d-6ff7f858630b?background=transparent&w=175&h=175&format=jpg">
+3. **三种核心面板模式，支持无限嵌套**
+   - **水平面板 (Horizontal)**：窗口左右横向排列。
+   - **垂直面板 (Vertical)**：窗口上下纵向堆叠。
+   - **堆叠面板 (Stack)**：类似多标签页重叠，适合多窗口快速切换。
+   - 支持自由嵌套（如左侧一个大窗口，右侧上下分栏，子栏内再堆叠）。
 
-Instead of manually arranging overlapping windows, FancyWM automatically organizes your applications into vertical, horizontal and stack panels. Windows flow into the focused panel as they open, resize gracefully when siblings close, and can be rearranged with simple keyboard shortcuts or mouse drag-and-drop. The result is a clutter-free workspace where every application has a deliberate place.
+4. **双通道混合操作（键盘 + 鼠标）**
+   - 支持强大的全局快捷键控制窗口移动、交换、分屏类型切换。
+   - 同时也原生支持鼠标直接拖拽窗口边框调整大小、拖放重组面板。
 
-## Why Tiling on Windows?
+5. **智能自适应与低资源消耗**
+   - 尊重 Windows 窗口最小尺寸（`WM_GETMINMAXINFO`），不破坏程序显示，遇到对话框等弹窗自动浮动（Float）。
+   - 原生 .NET 桌面进程运行，空闲时 CPU 占用 **< 1%**，内存占用轻量。
 
-Tiling fundamentally changes how you interact with a desktop. New windows stop overlapping; instead, they automatically claim their space alongside existing windows. Keyboard navigation replaces constant mousing. For developers, researchers, and power users managing multiple applications simultaneously - whether coding with reference docs, multi-tasking across projects, or orchestrating complex workflows - tiling reclaims significant time and cognitive load.
+---
 
-Windows offers Snap Layouts and Virtual Desktops, which are useful, but lack the control and dynamic behavior that tiling provides. FancyWM fills that gap: it's a practical entry point for users curious about tiling without abandoning the Windows ecosystem.
+## 🚀 快速上手与快捷键指南
 
-## Core Features
+软件运行后会常驻在系统右下角托盘区（如果托盘隐藏，请点击 `^` 箭头查看）。
 
-### Panels: Horizontal, Vertical, and Stacked
+### 常用默认快捷键
 
-FancyWM organizes windows into three panel types:
+激活热键默认为：`[Shift]` + `[Win]`（可随时在设置中修改）
 
-These panels can be **nested arbitrarily** - a horizontal panel containing vertical sub-panels, with stack panels embedded inside them. Build custom layouts by combining primitives, not by editing configuration files.
+| 快捷键操作 | 功能说明 |
+| :--- | :--- |
+| `[Shift] + [Win]` 然后按 `[H]` | 创建水平分屏面板 (Horizontal) |
+| `[Shift] + [Win]` 然后按 `[V]` | 创建垂直分屏面板 (Vertical) |
+| `[Shift] + [Win]` 然后按 `[S]` | 创建堆叠面板 (Stack) |
+| `[Shift] + [Win]` 然后按 `[方向键]` | 将当前活动窗口向指定方向移动/分屏 |
+| `[Shift] + [Win]` 然后按 `[F11]` | 全局开启 / 暂停平铺窗口管理 |
+| `[Shift] + [Win]` 然后按 `[R]` | 刷新当前工作区布局 |
+| `[Shift] + [Win]` 然后按 `[Esc]` | 取消当前的按键序列 |
 
-### No Configuration Needed
+> 💡 **提示**：按下激活组合键 `[Shift] + [Win]` 后，屏幕中央会自动弹出半透明的快捷键指引，直接按下对应按键即可完成操作。
 
-Forget predefined layout templates and complex configuration. FancyWM creates layouts as you work. The available keybingins are shown after you press **[⇧ Shift] + [⊞ Win]**.
+---
 
-1. Open your first window - it automatically fills the workspace.
-2. Open a second window - FancyWM creates a horizontal split; both windows now share the space.
-3. Create a vertical panel with `[⇧ Shift]` + `[⊞ Win]`, then `[V]` - the focused window moves into a new vertical panel.
-4. Create a stack panel with `[⇧ Shift]` + `[⊞ Win]`, then `[S]` - windows can now overlap as tabs.
-5. Drag windows between panels, or embed panels into other panels, refining the layout in real-time.
+## 📦 下载与运行
 
-### Hybrid Input: Keyboard and Mouse
+前往 [Releases 页面](https://github.com/Crucialmer/ScreenSplit/releases) 下载最新的绿色便携包：
 
-FancyWM respects that Windows users value both input methods:
+- **下载文件**：`ScreenSplit.zip`
+- **运行方法**：
+  1. 解压 `ScreenSplit.zip` 到任意英文路径（如 `D:\Tools\ScreenSplit`）。
+  2. 双击运行 `ScreenSplit.exe` 即可。
+  3. 初次启动将在托盘弹出气泡通知，并在程序目录自动生成 `./Data` 文件夹。
 
-This balances power-user efficiency with the approachability expected on Windows.
+---
 
-### Layout Constraints
+## 🛠️ 从源码编译
 
-Applications declare minimum and maximum window sizes via the Windows API (`WM_GETMINMAXINFO`). If an application refuses to resize smaller than its declared minimum, FancyWM respects that constraint - windows never shrink below their declared minimums. Dialogs, tooltips, and transient windows are automatically floated (removed from tiling) so they don't interfere with layouts. If a new window would cause your columns to shrink below the minimum size, that window will be automatically floated too.
-
-The consequence: **No overlapping tiles, no broken layouts** - the tiler adapts to application constraints rather than forcing applications into unsuitable sizes.
-
-### Native Virtual Desktops
-
-FancyWM integrates with Windows' native Virtual Desktops. Jump to desktop 1, 2, or 3 with `[⇧ Shift]` + `[⊞ Win]`, then `[1]`, `[2]`, `[3]`, or move a window to a different desktop with `[⇧ Shift]` + `[⊞ Win]`, `[⇧ Shift]` + `[1]`, `[2]`, `[3]`. Panel layouts can be per-monitor or global - your choice. This fits multi-project workflows: "Desktop 1 for coding, Desktop 2 for research, Desktop 3 for meetings," each with its own panel arrangement.
-
-### Low Resource Footprint
-
-FancyWM runs as a lightweight userland process, not a system service. Typical CPU usage is **<1%** in idle, with optional animation toggles to reduce power consumption on laptops. The C# implementation with .NET runtime is efficient enough for background window management without noticeable system impact.
-
-### Additional Controls
-
-☑ Toggle tiling on/off entirely with `[⇧ Shift]` + `[⊞ Win]`, then `[F11]` to briefly use floating windows
-
-☑ Maximize and restore individual windows without breaking the tiling layout
-
-☑ Auto-collapse single-window panels to reduce visual clutter
-
-☑ Disable animations for battery-conscious workflows
-
-☑ Window focus highlighting (brief blink) for visibility
-
-☑ Customizable keybindings - rebind everything to match your habits
-
-☑ Remap the activation hotkey to `[Ctrl]`+`[Win]` or `[Alt]`+`[Win]` if `[Shift]`+`[Win]` conflicts with other software
-
-## Design Philosophy
-
-FancyWM was built with specific criteria in mind, many of which aren't implemented together elsewhere:
-
-The result is a tiler that feels like a natural extension of Windows, not a Linux port.
-
-## Two-Pass Layout Algorithm
-
-Behind the scenes, FancyWM uses a two-pass algorithm to calculate window positions:
-
-**Pass 1: Constraint Collection**
-Query each window's minimum and maximum sizes (via `WM_GETMINMAXINFO`). Identify all panels in the hierarchy and their constraints.
-
-**Pass 2: Position Calculation**
-Given the panel tree and constraints, calculate pixel positions for each window such that no window is forced below its minimum. If insufficient space exists for all windows at their minimum sizes, FancyWM gracefully degrades - respecting minimums and potentially pushing windows beyond the visible workspace boundary rather than overlapping them.
-
-The consequence: **Layouts never break due to application constraints.** Each window gets equal space; closing a window simply redistributes that space equally among remaining windows.
-
-Binary Space Partitioning (BSP) divides space recursively into two regions with each split, which can create inefficient layouts or require manual rebalancing. FancyWM's equal-space approach is simpler to reason about and automatically adapts to changing window counts.
-
-## Native theme engine (in preview)
-
-FancyWM v2.19 adds support for custom theming using CSS. This is built using native platform API and does not use WebViews/Chromium, so it is fast and low-overhead.
-
-There is a lot more work needed to polish and improve this feature, so consider contributing or donating to the development.
-
-See some examples here: https://github.com/FancyWM/fancywm/pull/444#issuecomment-4016018314
-
-```
-panel-bar {
-    border-color: white;
-    border-width: 1px;
-    border-radius: 12px;
-    filter: drop-shadow(0px 0px 8px white);
-    background-image: linear-gradient(30deg,
-            red 0%, blue 20%, green 40%, green 60%, orange 60%);
-}
-```
-
-<img width="380" height="200" alt="Screenshot" src="https://github.com/user-attachments/assets/364ef9ac-340a-4fe9-a6e3-ae05273dcf53" />
-
-## [Downloads](https://github.com/FancyWM/fancywm/releases)
-
-Pre-built binaries can be downloaded from [Releases](https://github.com/FancyWM/fancywm/releases).
-
-These are built by an automated GitHub Action and you can see all of the [build steps](https://github.com/FancyWM/fancywm/blob/main/.github/workflows/dotnet-desktop.yml) and [previous runs](https://github.com/FancyWM/fancywm/actions/workflows/dotnet-desktop.yml).
-
-### Install via winget (Recommended)
 ```powershell
-winget install fancywm
+# 1. 克隆本仓库及子模块
+git clone --recursive https://github.com/Crucialmer/ScreenSplit.git
+cd ScreenSplit
+
+# 2. 编译自包含绿色便携版本
+dotnet publish FancyWM/FancyWM.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=false -o dist/ScreenSplit
 ```
-
-### Install from the Microsoft Store
-
-<a href='//www.microsoft.com/store/apps/9p1741lkhqs9?cid=storebadge&ocid=badge'><img src='https://developer.microsoft.com/store/badges/images/English_get-it-from-MS.png' alt='English badge' width="138" height="50"/></a>
-
-### Install .msixbundle (Not Recommended)
-You can test the Microsoft Store packages by installing them using PowerShell.
-
-#### PowerShell (as Administrator)
-```powershell
-certutil.exe -addstore TrustedPeople .\FancyWM.Package_1.0.0.0.x64.cer
-Add-AppxPackage -Path .\FancyWM.Package_1.0.0.0.x64.msixbundle
-```
-
-## [User's Guide](https://github.com/FancyWM/fancywm/wiki#users-guide)
-Head over to the [Wiki](https://github.com/FancyWM/fancywm/wiki).
-
-## [Issues](https://github.com/FancyWM/fancywm/issues)
-Please, take the time to report any problems you experience by:
-- Opening an issue on https://github.com/fancywm/fancywm/issues (feature requests also welcome)
-In case of crashes, please also remember to save and attach the log file produced by the application.
-
-## Building from source
-
-Clone this repo, including submodules.
-
-```bash
-git clone --recursive https://github.com/FancyWM/fancywm.git
-```
-
-Open the .sln file with Visual Studio 2022 and build the FancyWM project.
-
-## WinMan & WinMan.Windows
-FancyWM is based on [WinMan](https://github.com/veselink1/winman) and [WinMan.Windows](https://github.com/veselink1/winman-windows).
-
-## Screenshots
-<img src="https://store-images.s-microsoft.com/image/apps.47394.14517052119257390.5224238b-c5af-4852-a39a-2732c3935e69.60fa12a6-ac5a-47cb-9501-2ca7964d972d?w=1280&h=720&q=90&mode=letterbox&format=jpg" width="640">
-Light theme, Vertical panel on the left
 
 ---
 
-<img src="https://store-images.s-microsoft.com/image/apps.11856.14517052119257390.5224238b-c5af-4852-a39a-2732c3935e69.81bfbc4c-0b20-4b1e-a1b5-b8e6fa13f8a6?w=1280&h=720&q=90&mode=letterbox&format=jpg" width="640">
-Dark theme, Vertical panel on the left, Stack panel with 3 VS Code windows on the right
+## 📄 开源许可与致谢
 
----
-
-<img src="https://store-images.s-microsoft.com/image/apps.11856.14517052119257390.5224238b-c5af-4852-a39a-2732c3935e69.81bfbc4c-0b20-4b1e-a1b5-b8e6fa13f8a6?w=1280&h=720&q=90&mode=letterbox&format=jpg" width="640">
-Vertical panel on the left, Edge in the middle, Vertical panel on the right
-
----
+- 本项目基于 [FancyWM](https://github.com/fancywm/fancywm) 进行了绿色化与纯净分屏定制改造。
+- 底层窗口管理基于 [WinMan](https://github.com/fancywm/winman) 及 [WinMan.Windows](https://github.com/fancywm/winman-windows)。
+- 本项目遵循 MIT 开源许可协议。

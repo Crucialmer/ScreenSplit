@@ -13,10 +13,10 @@
         </Grid.ColumnDefinitions>
         <ui:SimpleStackPanel HorizontalAlignment="Stretch" Orientation="Vertical" Margin="12" Spacing="24">
             <TextBlock Text="{x:Static res:Strings.About_Caption}" Style="{StaticResource TitleTextBlockStyle}" />
-            <TextBlock Text="FancyWM" Style="{StaticResource SubtitleTextBlockStyle}" />
+            <TextBlock Text="ScreenSplit" Style="{StaticResource SubtitleTextBlockStyle}" />
             <Border Style="{DynamicResource SettingsItemStyle}">
                 <StackPanel>
-                    <Image HorizontalAlignment="Left" Width="96" Height="96" Source="../../Resources/Icon.ico" />
+                    <Image HorizontalAlignment="Left" Width="96" Height="96" Source="/Resources/Icon.ico" />
                     <TextBlock>
                     <Run Text="{x:Static res:Strings.About_AppVersion}" /> <Run Text="{Binding AppVersionText, Mode=OneTime}" /> <LineBreak />
                     <Run Text="{x:Static res:Strings.About_Copyright}" />
@@ -24,30 +24,8 @@
                 </StackPanel>
             </Border>
             <TextBlock>
-                <Hyperlink NavigateUri="https://www.microsoft.com/en-aq/store/standard-application-license-terms">Standard Application License Terms</Hyperlink>
+                <Hyperlink NavigateUri="https://github.com/Crucialmer/ScreenSplit" RequestNavigate="OnHyperlinkRequestNavigate">https://github.com/Crucialmer/ScreenSplit</Hyperlink>
             </TextBlock>
-            <TextBlock Text="Support FancyWM" Style="{StaticResource SubtitleTextBlockStyle}" />
-            <TextBlock>
-                <Run Text="{x:Static res:Strings.About_FOSS}" />
-            </TextBlock>
-            <ui:SimpleStackPanel Orientation="Horizontal" Spacing="4">
-                <Border CornerRadius="{StaticResource ControlCornerRadius}" Margin="4" Background="#3f51b5">
-                    <Button HorizontalAlignment="Stretch" TextBlock.FontWeight="Bold" TextBlock.Foreground="#ff80ab" Click="OnSponsorButtonClick">
-                        <StackPanel Orientation="Horizontal">
-                            <ui:FontIcon FontSize="14" FontFamily="Segoe MDL2 Assets" Glyph="&#xEB52;" Margin="0,0,8,0" />
-                            <TextBlock Text="Donate" />
-                        </StackPanel>
-                    </Button>
-                </Border>
-                <Border CornerRadius="{StaticResource ControlCornerRadius}" Margin="4" Background="#ff5722">
-                    <Button HorizontalAlignment="Stretch" TextBlock.FontWeight="Bold" TextBlock.Foreground="#ffe57f" Click="OnReviewButtonClick">
-                        <StackPanel Orientation="Horizontal">
-                            <ui:FontIcon FontSize="14" FontFamily="Segoe MDL2 Assets" Glyph="&#xE735;" Margin="0,0,8,0" />
-                            <TextBlock Text="Review" />
-                        </StackPanel>
-                    </Button>
-                </Border>
-            </ui:SimpleStackPanel>
             <TextBlock Text="{x:Static res:Strings.About_Credits}" Style="{StaticResource SubtitleTextBlockStyle}" />
             <Border Style="{DynamicResource SettingsItemStyle}">
                 <StackPanel Orientation="Vertical">

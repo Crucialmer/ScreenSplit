@@ -106,12 +106,12 @@ A clear and concise description of what you expected to happen.
 
 **Desktop (please complete the following information):**
  - OS: {Environment.OSVersion.VersionString}
- - FancyWM Version: {App.Current.VersionString}
+ - ScreenSplit Version: {App.Current.VersionString}
 
 **Additional context**
 Add any other context about the problem here.
 ");
-            var uri = new Uri($"https://github.com/fancywm/fancywm/issues/new?labels=bug&title={title}&body={body}");
+            var uri = new Uri($"https://github.com/Crucialmer/ScreenSplit/issues/new?labels=bug&title={title}&body={body}");
             _ = Launcher.LaunchUriAsync(uri);
         }
 

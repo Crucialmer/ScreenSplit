@@ -37,7 +37,7 @@
                 <TextBlock TextWrapping="Wrap">
                     <Run Text="{x:Static res:Strings.ErrorMessageBox_Description_CheckForSolution}" />
                     <!-- Seems like anything from ModernWpf accessing the Accent Color from another thread crashes. We simulate a link here, intead of using Hyperlink, to work around this. -->
-                    <Run Cursor="Hand" Foreground="#0078D7" TextDecorations="Underline"  MouseDown="OnRequestNavigate">github.com/fancywm/fancywm/issues</Run>.
+                    <Run Cursor="Hand" Foreground="#0078D7" TextDecorations="Underline"  MouseDown="OnRequestNavigate">github.com/Crucialmer/ScreenSplit/issues</Run>.
                     <LineBreak />
                     <LineBreak />
                     <Run Text="{x:Static res:Strings.ErrorMessageBox_Description_SubmittingALog}" />

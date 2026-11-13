@@ -61,10 +61,10 @@ namespace FancyWM
             if (args.Contains("--help") || args.Contains("-h"))
             {
                 Console.WriteLine($@"
-FancyWM - Dynamic Tiling Window Manager
-=======================================
+ScreenSplit - Dynamic Tiling Window Manager
+===========================================
 
-USAGE: FancyWM.exe [OPTIONS] [ACTION]
+USAGE: ScreenSplit.exe [OPTIONS] [ACTION]
 
 OPTIONS:
     -h, --help                Show this help
@@ -73,12 +73,12 @@ OPTIONS:
     --action NAME             Execute specific action directly
 
 EXAMPLES:
-    FancyWM --action CreateHorizontalPanel
+    ScreenSplit --action CreateHorizontalPanel
 
 ACTIONS:
 {GenerateActionsHelp()}
 
-Type 'FancyWM --help' from anywhere after installation.
+Type 'ScreenSplit --help' from anywhere after installation.
 ");
                 return 0;
             }
@@ -133,7 +133,7 @@ Type 'FancyWM --help' from anywhere after installation.
                 .Any();
             if (exists)
             {
-                MessageBox.Show(Strings.About_AlreadyRunning, "FancyWM", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(Strings.About_AlreadyRunning, "ScreenSplit", MessageBoxButton.OK, MessageBoxImage.Error);
                 return 1;
             }
 
@@ -166,7 +166,7 @@ Type 'FancyWM --help' from anywhere after installation.
 
             // Create logger
             var logger = provider.GetRequiredService<ILogger>();
-            logger.Warning($"FancyWM v{GetVersionString()} (https://www.microsoft.com/store/apps/9P1741LKHQS9) on {Environment.OSVersion}");
+            logger.Information($"ScreenSplit v{GetVersionString()} on {Environment.OSVersion}");
 
             ConfigureThreadPriority(logger);
 
@@ -348,7 +348,7 @@ Type 'FancyWM --help' from anywhere after installation.
             var hwnd = PInvoke.FindWindow(null, "ScreenSplitMainWindow").Value;
             if (hwnd == IntPtr.Zero)
             {
-                throw new InvalidOperationException("FancyWM is not running!");
+                throw new InvalidOperationException("ScreenSplit is not running!");
             }
             WindowCopyDataHelper.Send(hwnd, Encoding.Default.GetBytes(message));
         }

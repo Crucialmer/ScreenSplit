@@ -8,6 +8,10 @@
     <UseWPF>true</UseWPF>
     <ApplicationIcon>Icon4.ico</ApplicationIcon>
     <Authors>Crucialmer</Authors>
+    <Product>ScreenSplit</Product>
+    <Company>Crucialmer</Company>
+    <Description>ScreenSplit - Dynamic Tiling Window Manager for Windows</Description>
+    <Copyright>Copyright © 2026 Crucialmer. All Rights Reserved.</Copyright>
     <PackageIcon>Icon.png</PackageIcon>
     <Platforms>AnyCPU;x64;x86</Platforms>
     <StartupObject>FancyWM.Startup</StartupObject>

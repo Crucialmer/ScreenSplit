@@ -83,7 +83,7 @@ namespace FancyWM.Pages.Settings
 
             var actionsHelp = string.Join('\n', Enum.GetNames<Models.BindableAction>().Select(static action =>
             {
-                var actionCode = $"FancyWM(\"{action}\")";
+                var actionCode = $"ScreenSplit(\"{action}\")";
                 return $"; {actionCode,-35} ; {Strings.ResourceManager.GetString($"Keybinding.{action}.Description")}";
             }));
 

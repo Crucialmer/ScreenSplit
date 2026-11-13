@@ -422,7 +422,7 @@ namespace FancyWM
         {
             try
             {
-                var latestVersion = await releaseChecker.GetLatestStableVersionAsync("fancywm", "FancyWM");
+                var latestVersion = await releaseChecker.GetLatestStableVersionAsync("Crucialmer", "ScreenSplit");
                 var currentVersion = new Version(App.Current.VersionString);
                 if (latestVersion > currentVersion)
                 {

@@ -133,7 +133,7 @@ namespace FancyWM
         {
             Process.Start(new ProcessStartInfo
             {
-                FileName = "https://fancywm.github.io/fancywm/donate.html",
+                FileName = "https://github.com/Crucialmer/ScreenSplit",
                 UseShellExecute = true,
                 Verb = "open",
             });
@@ -199,7 +199,7 @@ namespace FancyWM
             // explorer.exe is what most-likely caused the crash in the first place.
             if (exception is COMException && exception.StackTrace?.Contains("Win32VirtualDesktopManager") == true && DidExplorerJustCrash())
             {
-                exception = new COMException($"Windows Explorer (explorer.exe) just crashed and this caused the virtual desktop service to fail! FancyWM received the following error message: {exception.Message}", exception);
+                exception = new COMException($"Windows Explorer (explorer.exe) just crashed and this caused the virtual desktop service to fail! ScreenSplit received the following error message: {exception.Message}", exception);
             }
 
             // Show error dialog
