@@ -582,6 +582,8 @@ namespace FancyWM
                     var win = m_movingWindow;
                     m_movingWindow = null;
                     m_currentInteraction = UserInteraction.None;
+                    m_isDraggingTitleBar = false;
+                    m_isDraggingSnappedWindow = false;
                     SetPreviewRectangle(null, null);
                     DoWindowMove(win);
                 }
@@ -1464,6 +1466,8 @@ namespace FancyWM
                 var restoredRect = Rectangle.OffsetAndSize(targetX, targetY, targetW, targetH);
                 ApplyWindowSnap(window, restoredRect);
             }
+            m_isDraggingSnappedWindow = false;
+            m_isDraggingTitleBar = false;
 
             // 未落在停靠区：拖出分屏后自由浮动
             using (m_backendLock.EnterScope())
@@ -1492,6 +1496,7 @@ namespace FancyWM
             var win = m_movingWindow;
             m_movingWindow = null;
             m_isDraggingTitleBar = false;
+            m_isDraggingSnappedWindow = false;
 
             if (win != null && (m_currentInteraction == UserInteraction.Moving || CanManage(win, ignoreFloating: true)))
             {
@@ -1571,6 +1576,8 @@ namespace FancyWM
                 {
                     m_currentInteraction = UserInteraction.Resizing;
                     _ = m_dispatcher.InvokeAsync(() => m_dragTrackingTimer.Stop());
+                    m_isDraggingTitleBar = false;
+                    m_isDraggingSnappedWindow = false;
                     SetPreviewRectangle(null, null);
                     using (m_preSnapRectanglesLock.EnterScope())
                     {
@@ -1848,7 +1855,16 @@ namespace FancyWM
             m_movingWindow = e.Source;
 
             var cursor = m_workspace.CursorLocation;
-            var startPos = e.OldPosition.Width > 0 ? e.OldPosition : e.Source.Position;
+            Rectangle startPos = default;
+            if (PInvoke.GetWindowRect(new(e.Source.Handle), out RECT win32Rc))
+            {
+                startPos = new Rectangle(win32Rc.left, win32Rc.top, win32Rc.right, win32Rc.bottom);
+            }
+            if (startPos.Width <= 0 || startPos.Height <= 0)
+            {
+                startPos = e.OldPosition.Width > 0 ? e.OldPosition : e.Source.Position;
+            }
+
             m_logger.Information("[Drag] PositionChangeStart on {Window}, Pos={Pos}, Cursor={Cursor}", e.Source.DebugString(), startPos, cursor);
             if (startPos.Width > 0)
             {
@@ -1869,7 +1885,7 @@ namespace FancyWM
                 hasPreSnap = m_preSnapRectangles.TryGetValue(e.Source, out preSnapRect);
             }
 
-            if (wasSnapped || hasPreSnap)
+            if (wasSnapped)
             {
                 m_isDraggingSnappedWindow = true;
                 if (!hasPreSnap || preSnapRect.Width <= 0 || preSnapRect.Height <= 0)
@@ -1892,6 +1908,7 @@ namespace FancyWM
                 m_isDraggingSnappedWindow = false;
                 using (m_preSnapRectanglesLock.EnterScope())
                 {
+                    m_preSnapRectangles.Remove(e.Source);
                     m_activeDragOriginalRect[e.Source] = startPos;
                 }
                 m_currentDragTargetSize = new WinMan.Point(startPos.Width, startPos.Height);
