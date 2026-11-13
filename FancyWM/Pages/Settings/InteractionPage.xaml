@@ -16,67 +16,14 @@
         <ui:SimpleStackPanel HorizontalAlignment="Stretch" Orientation="Vertical" Margin="0,0,0,32" Spacing="4">
             <TextBlock Text="{x:Static res:Strings.Interaction_Caption}" Style="{DynamicResource TitleTextBlockStyle}" Margin="0, 0, 0, 20" />
 
-            <TextBlock Text="{x:Static res:Strings.Interaction_TilingBehavior}" Style="{DynamicResource SubtitleTextBlockStyle}" Margin="0, 20" />
+            <TextBlock Text="吸附与窗口行为" Style="{DynamicResource SubtitleTextBlockStyle}" Margin="0, 20" />
             <Border Style="{DynamicResource SettingsItemStyle}">
                 <StackPanel>
                     <DockPanel LastChildFill="True">
                         <CheckBox DockPanel.Dock="Right" IsChecked="{Binding Path=AutoFloatNewWindows, Mode=TwoWay}" />
-                        <TextBlock VerticalAlignment="Center" Text="新打开窗口默认保持浮动（不自动分屏）" FontWeight="Medium" Margin="0,0,16,0" />
+                        <TextBlock VerticalAlignment="Center" Text="所有窗口默认保持自由浮动" FontWeight="Medium" Margin="0,0,16,0" />
                     </DockPanel>
-                    <TextBlock TextWrapping="WrapWithOverflow" Padding="0,12,0,0" VerticalAlignment="Center" Text="默认开启。新窗口打开时不会被强制放入切分区打乱现有分屏。你可以按住 Shift + 鼠标左键将窗口拖放进切分区，或直接拖拽至屏幕四周/四角进行智能停靠。" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" />
-                </StackPanel>
-            </Border>
-            <Border Style="{DynamicResource SettingsItemStyle}">
-                <StackPanel>
-                    <DockPanel LastChildFill="True">
-                        <CheckBox DockPanel.Dock="Right" IsChecked="{Binding Path=AllocateNewPanelSpace, Mode=TwoWay}" />
-                        <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.Interaction_AllocateNewPanelSpace}" Margin="0,0,16,0" />
-                    </DockPanel>
-                    <TextBlock TextWrapping="WrapWithOverflow" Padding="0,16,0,0" VerticalAlignment="Center" Text="{x:Static res:Strings.Interaction_AllocateNewPanelSpace_Description}" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" />
-                </StackPanel>
-            </Border>
-
-            <Border Style="{DynamicResource SettingsItemStyle}">
-                <StackPanel>
-                    <DockPanel LastChildFill="True">
-                        <CheckBox DockPanel.Dock="Right" IsChecked="{Binding Path=AutoCollapsePanels, Mode=TwoWay}" />
-                        <TextBlock VerticalAlignment="Center" Margin="0,0,16,0" Text="{x:Static res:Strings.Interaction_AutoCollapsePanels}" />
-                    </DockPanel>
-                    <TextBlock TextWrapping="WrapWithOverflow" Padding="0,16,0,0" VerticalAlignment="Center" Text="{x:Static res:Strings.Interaction_AutoCollapsePanels_Description}" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" />
-                </StackPanel>
-            </Border>
-
-            <Border Style="{DynamicResource SettingsItemStyle}">
-                <StackPanel>
-                    <DockPanel LastChildFill="True">
-                        <CheckBox DockPanel.Dock="Right" IsChecked="{Binding Path=DelayReposition, Mode=TwoWay}" />
-                        <TextBlock VerticalAlignment="Center" Margin="0,0,16,0" Text="{x:Static res:Strings.Interaction_DelayReposition}" />
-                    </DockPanel>
-                    <TextBlock TextWrapping="WrapWithOverflow" Padding="0,16,0,0" VerticalAlignment="Center" Text="{x:Static res:Strings.Interaction_DelayReposition_Description}" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" />
-                </StackPanel>
-            </Border>
-
-            <Border Style="{DynamicResource SettingsItemStyle}">
-                <StackPanel Orientation="Vertical">
-                    <StackPanel Orientation="Horizontal">
-                        <Slider
-                            x:Name="AutoSplitCountSlider"
-                            ui:ControlHelper.Header="{x:Static res:Strings.Interaction_AutoSplitCount}"
-                            HorizontalAlignment="Left"
-                            Maximum="10"
-                            Minimum="2"
-                            IsSnapToTickEnabled="True"
-                            TickFrequency="1"
-                            Value="{Binding AutoSplitCount, Mode=TwoWay}"
-                            Width="200" />
-
-                        <TextBlock
-                            VerticalAlignment="Center"
-                            Padding="10,20,0,0"
-                            Text="{Binding Value, ElementName=AutoSplitCountSlider, Mode=OneWay}"  />
-                    </StackPanel>
-
-                    <TextBlock TextWrapping="WrapWithOverflow" Padding="0,16,0,0" VerticalAlignment="Center" Text="{x:Static res:Strings.Interaction_AutoSplitCount_Description}" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" />
+                    <TextBlock TextWrapping="WrapWithOverflow" Padding="0,12,0,0" VerticalAlignment="Center" Text="默认开启。所有窗口均保持自由浮动模式，直接用鼠标拖动至屏幕四周边缘或四个角落即可触发智能停靠吸附。" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" />
                 </StackPanel>
             </Border>
 

@@ -189,13 +189,13 @@
                                 <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE777;" Foreground="White" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="离开边缘即刻恢复原始尺寸" FontWeight="Medium" FontSize="13" Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}" />
-                                <TextBlock Text="按住标题栏拖动已停靠边缘的窗口，在移动瞬间立即还原为原始尺寸，方便跟随鼠标自由放置。" FontSize="11.5" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                                <TextBlock Text="离开边缘自动恢复原始尺寸" FontWeight="Medium" FontSize="13" Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}" />
+                                <TextBlock Text="将已停靠边缘的窗口拖离边缘至屏幕任意区域，松开时窗口立即自动还原为停靠前的原始尺寸。" FontSize="11.5" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
                             </StackPanel>
                         </DockPanel>
                     </Border>
 
-                    <!-- Feature 4: Free Partition Management -->
+                    <!-- Feature 4: Free Floating & Multi-Monitor -->
                     <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
                             BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
                             BorderThickness="1"
@@ -206,8 +206,8 @@
                                 <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE7C9;" Foreground="White" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="切分区自由管理（灵活进出）" FontWeight="Medium" FontSize="13" Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}" />
-                                <TextBlock Text="按住 Shift 键拖拽窗口可放入切分区；直接拖动已分屏窗口即可瞬间摆脱切分区恢复自由浮动。" FontSize="11.5" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                                <TextBlock Text="纯自由浮动与多屏智能适配" FontWeight="Medium" FontSize="13" Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}" />
+                                <TextBlock Text="所有窗口默认自由浮动，纯鼠标直觉拖拽；支持多显示器跨屏吸附停靠，操作更轻松。" FontSize="11.5" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
                             </StackPanel>
                         </DockPanel>
                     </Border>

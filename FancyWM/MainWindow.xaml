@@ -14,7 +14,7 @@
     <Window.Resources>
         <ContextMenu x:Key="NotifierContextMenu" Placement="MousePoint">
             <MenuItem Header="ScreenSplit  v2.19.1" IsEnabled="False" FontWeight="SemiBold" />
-            <MenuItem Header="纯绿色便携 · 自定义平铺分屏" IsEnabled="False" FontSize="11" Margin="0,-3,0,0" />
+            <MenuItem Header="纯绿色便携 · 边缘智能吸附分屏" IsEnabled="False" FontSize="11" Margin="0,-3,0,0" />
             <Separator />
             <MenuItem Header="{x:Static res:Strings.Settings}" Click="OnSettingsClick">
                 <MenuItem.Icon>

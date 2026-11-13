@@ -1442,48 +1442,6 @@ namespace FancyWM
 
                 if (m_currentInteraction == UserInteraction.Moving)
                 {
-                    // 离开边缘/角落时，在移动前立即恢复停靠前的原始窗口尺寸，方便跟随鼠标自由放置
-                    bool hadPreSnap = false;
-                    Rectangle preSnapRect = default;
-                    using (m_preSnapRectanglesLock.EnterScope())
-                    {
-                        if (m_preSnapRectangles.TryGetValue(e.Source, out preSnapRect))
-                        {
-                            hadPreSnap = true;
-                            m_preSnapRectangles.Remove(e.Source);
-                            m_activeDragOriginalRect[e.Source] = preSnapRect;
-                        }
-                    }
-
-                    if (hadPreSnap && preSnapRect.Width > 0 && preSnapRect.Height > 0)
-                    {
-                        var cursor = m_workspace.CursorLocation;
-                        var wa = m_display.WorkArea;
-                        int targetW = preSnapRect.Width;
-                        int targetH = preSnapRect.Height;
-
-                        if (targetW >= wa.Width && targetH >= wa.Height)
-                        {
-                            targetW = (int)(wa.Width * 0.65);
-                            targetH = (int)(wa.Height * 0.70);
-                        }
-                        targetW = Math.Clamp(targetW, 400, (int)(wa.Width * 0.95));
-                        targetH = Math.Clamp(targetH, 300, (int)(wa.Height * 0.95));
-
-                        int targetX = cursor.X - (int)(targetW * m_dragGrabRatioX);
-                        int targetY = cursor.Y - 15;
-
-                        if (targetX < wa.Left) targetX = wa.Left;
-                        if (targetX + targetW > wa.Right) targetX = wa.Right - targetW;
-                        if (targetY < wa.Top) targetY = wa.Top;
-                        if (targetY + targetH > wa.Bottom) targetY = wa.Bottom - targetH;
-
-                        var restoredRect = Rectangle.OffsetAndSize(targetX, targetY, targetW, targetH);
-                        m_logger.Information("Window {Window} dragged away from edge/corner, immediately restoring pre-snap rectangle {Rect} during drag",
-                            e.Source.DebugString(), restoredRect);
-                        ApplyWindowSnap(e.Source, restoredRect);
-                    }
-
                     SetPreviewRectangle(GetPreviewRectangle());
                 }
                 else
@@ -1818,18 +1776,7 @@ namespace FancyWM
             window.TopmostChanged -= OnWindowTopmostChanged;
         }
 
-        private bool IsSwapModifierPressed()
-        {
-            static bool GetState() => Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift);
-            if (m_dispatcher.CheckAccess())
-            {
-                return GetState();
-            }
-            else
-            {
-                return m_dispatcher.Invoke(GetState, System.Windows.Threading.DispatcherPriority.Send);
-            }
-        }
+        private bool IsSwapModifierPressed() => false;
 
         private bool DetectChanges(IWindow window)
         {

@@ -565,10 +565,10 @@
     <value>你随时可以在系统右下角任务栏托盘中找到它。</value>
   </data>
   <data name="Startup.Paragraph1" xml:space="preserve">
-    <value>按住激活组合键 [Shift] + [Win]，弹出快捷键指引后，直接按 [H]、[V] 或 [S] 即可自定义分屏。</value>
+    <value>拖拽窗口至四周边缘可半屏停靠，拖拽至四个角落可四分之一屏停靠。</value>
   </data>
   <data name="Startup.Paragraph2" xml:space="preserve">
-    <value>你也可以随时按住 Shift + 鼠标左键将窗口拖拽放进切分区中。</value>
+    <value>拖离边缘松开鼠标即可自动恢复停靠前的原始窗口状态。</value>
   </data>
   <data name="Startup.ShowThisWindow" xml:space="preserve">
     <value>软件启动时显示此引导窗口</value>
@@ -673,7 +673,7 @@
     <value>已达到最顶层，无法再向上一级提升！</value>
   </data>
   <data name="TilingError.TargetCannotFit" xml:space="preserve">
-    <value>目标切分区域空间不足，无法放入窗口！</value>
+    <value>屏幕空间不足，无法放入窗口！</value>
   </data>
   <data name="ErrorMessageBox.RestartFancyWM" xml:space="preserve">
     <value>重启 ScreenSplit</value>

@@ -471,44 +471,18 @@ namespace FancyWM
                     cmdHk.Pressed -= OnCmdSequenceBegin;
                     cmdHk.Dispose();
                 }
-            }
-
-            m_cmdHks = CreateHotkeyVariants(hk)
-                .Select(hk => new LowLevelHotkey(m_llkbdHook, hk.KeyA, hk.KeyB)
-                {
-                    HideKeyPress = false,
-                    ScanOnRelease = true,
-                    SideAgnostic = true,
-                    ClearModifiersOnMiss = true,
-                }).ToArray();
-
-            foreach (var cmdHk in m_cmdHks)
-            {
-                cmdHk.Pressed += OnCmdSequenceBegin;
+                m_cmdHks = null;
             }
         }
 
         private void RebindCapsLockHotkey(bool enabled)
         {
-            if (!enabled)
+            if (m_capsLockHk != null)
             {
-                if (m_capsLockHk != null)
-                {
-                    m_capsLockHk.Pressed -= OnCmdSequenceBegin;
-                    m_capsLockHk.Dispose();
-                    m_capsLockHk = null;
-                }
-                return;
+                m_capsLockHk.Pressed -= OnCmdSequenceBegin;
+                m_capsLockHk.Dispose();
+                m_capsLockHk = null;
             }
-
-            m_capsLockHk = new LowLevelHotkey(m_llkbdHook, [], KeyCode.CapsLock)
-            {
-                HideKeyPress = true,
-                ScanOnRelease = false,
-                SideAgnostic = false,
-                ClearModifiersOnMiss = true,
-            };
-            m_capsLockHk.Pressed += OnCmdSequenceBegin;
         }
 
         private void RebindDirectHotkeys(KeybindingDictionary keybindings)

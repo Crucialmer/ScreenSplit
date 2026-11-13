@@ -70,20 +70,20 @@
                             <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE777;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="拖离边缘即刻还原原始尺寸" FontWeight="Medium" FontSize="13.5" />
-                            <TextBlock Text="按住标题栏拖动已停靠边缘的窗口，在移动的瞬间窗口立即自动还原为停靠前的原始尺寸与状态，方便跟随鼠标自由放置于屏幕任意位置。" TextWrapping="Wrap" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,3,0,0" />
+                            <TextBlock Text="拖离边缘自动还原原始尺寸" FontWeight="Medium" FontSize="13.5" />
+                            <TextBlock Text="按住标题栏将已停靠边缘的窗口拖离边缘至屏幕任意区域，松开时窗口立即自动还原为停靠前的原始尺寸与状态，无缝衔接日常使用。" TextWrapping="Wrap" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,3,0,0" />
                         </StackPanel>
                     </DockPanel>
                 </ui:SimpleStackPanel>
             </Border>
 
-            <!-- Tiling Partition & Floating Gestures -->
-            <TextBlock Text="切分区自由管理（灵活进出）" Style="{DynamicResource SubtitleTextBlockStyle}" Margin="2,12,0,4" />
+            <!-- Free Floating & Snapping Card -->
+            <TextBlock Text="纯自由浮动与多显示器适配" Style="{DynamicResource SubtitleTextBlockStyle}" Margin="2,12,0,4" />
             <Border Style="{DynamicResource SettingsItemStyle}">
                 <ui:SimpleStackPanel Spacing="10">
-                    <TextBlock Text="• 摆脱切分区（恢复自由浮动）：直接用鼠标按住标题栏拖动已分屏的窗口（无需按任何键），松开后该窗口即可摆脱切分区，恢复为自由浮动窗口！" TextWrapping="Wrap" FontWeight="Medium" />
-                    <TextBlock Text="• 放进切分区（加入并排平铺）：按住键盘 Shift 键，然后拖拽任意窗口到目标分屏区域松开，即可直接放进切分区中。" TextWrapping="Wrap" FontWeight="Medium" />
-                    <TextBlock Text="• 自由缩放分屏比例：将鼠标悬停在各分屏区域之间的边框缝隙处，按住左键拖拽即可自由缩放各窗口的显示比例。" TextWrapping="Wrap" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" />
+                    <TextBlock Text="• 自由浮动模式：所有窗口默认保持自由浮动，无任何强制切分区打扰，彻底摆脱传统平铺窗口管理器的复杂束缚。" TextWrapping="Wrap" FontWeight="Medium" />
+                    <TextBlock Text="• 纯鼠标直觉交互：拖动窗口至四周边缘吸附为半屏，拖动至四个角落吸附为四分之一屏；离开边缘松开即刻还原原始尺寸。" TextWrapping="Wrap" FontWeight="Medium" />
+                    <TextBlock Text="• 多显示器独立吸附：无论主副屏幕，均可在任意显示器边缘与四角自由吸附与跨屏放置。" TextWrapping="Wrap" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" />
                 </ui:SimpleStackPanel>
             </Border>
 
