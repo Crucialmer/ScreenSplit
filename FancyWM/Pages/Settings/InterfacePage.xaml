@@ -22,20 +22,6 @@
             <Border Style="{DynamicResource SettingsItemStyle}">
                 <StackPanel>
                     <DockPanel LastChildFill="True">
-                        <CheckBox DockPanel.Dock="Right" IsChecked="{Binding Path=ShowContextHints, Mode=TwoWay}" />
-                        <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.Interface_ShowContextHints}" Margin="0,0,16,0" />
-                    </DockPanel>
-                    <TextBlock TextWrapping="WrapWithOverflow" Padding="0,16,0,0" VerticalAlignment="Center" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}">
-                    <Run Text="{x:Static res:Strings.Interface_ShowContextHints_Description}" />
-                    <Run Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">&#160;Esc&#160;</Run>
-                    <Run>.</Run>
-                    </TextBlock>
-                </StackPanel>
-            </Border>
-
-            <Border Style="{DynamicResource SettingsItemStyle}">
-                <StackPanel>
-                    <DockPanel LastChildFill="True">
                         <CheckBox DockPanel.Dock="Right" IsChecked="{Binding Path=ShowFocus, Mode=TwoWay}" />
                         <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.Interface_ShowFocus}" Margin="0,0,16,0" />
                     </DockPanel>
@@ -76,46 +62,6 @@
                         VerticalAlignment="Center"
                         Padding="10,20,0,0"
                         Text="{Binding Value, ElementName=WindowPaddingSlider, Mode=OneWay}"  />
-                </StackPanel>
-            </Border>
-
-            <Border Style="{DynamicResource SettingsItemStyle}" Visibility="Collapsed">
-                <StackPanel Orientation="Horizontal">
-                    <Slider
-                        x:Name="PanelHeightSlider"
-                        ui:ControlHelper.Header="{x:Static res:Strings.Interface_PanelHeight}"
-                        HorizontalAlignment="Left"
-                        Maximum="32"
-                        Minimum="0"
-                        IsSnapToTickEnabled="True"
-                        TickFrequency="2"
-                        Value="{Binding PanelHeight, Mode=TwoWay}"
-                        Width="200" />
-
-                    <TextBlock
-                        VerticalAlignment="Center"
-                        Padding="10,20,0,0"
-                        Text="{Binding Value, ElementName=PanelHeightSlider, Mode=OneWay}"  />
-                </StackPanel>
-            </Border>
-
-            <Border Style="{DynamicResource SettingsItemStyle}" Visibility="Collapsed">
-                <StackPanel Orientation="Horizontal">
-                    <Slider
-                        x:Name="PanelFontSizeSlider"
-                        ui:ControlHelper.Header="{x:Static res:Strings.Interface_PanelFontSize}"
-                        HorizontalAlignment="Left"
-                        Maximum="24"
-                        Minimum="0"
-                        IsSnapToTickEnabled="True"
-                        TickFrequency="2"
-                        Value="{Binding PanelFontSize, Mode=TwoWay}"
-                        Width="200" />
-
-                    <TextBlock
-                        VerticalAlignment="Center"
-                        Padding="10,20,0,0"
-                        Text="{Binding Value, ElementName=PanelFontSizeSlider, Mode=OneWay}"  />
                 </StackPanel>
             </Border>
 

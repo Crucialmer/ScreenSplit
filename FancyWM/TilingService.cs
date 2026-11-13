@@ -171,6 +171,7 @@ namespace FancyWM
         private readonly Utilities.DebugLock m_savedLocationsLock = new(LockThreshold);
 
         private readonly Dictionary<IWindow, Rectangle> m_preSnapRectangles = [];
+        private readonly Dictionary<IWindow, Rectangle> m_activeDragOriginalRect = [];
         private readonly Utilities.DebugLock m_preSnapRectanglesLock = new(LockThreshold);
         private double m_dragGrabRatioX = 0.5;
 

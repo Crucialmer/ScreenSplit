@@ -70,8 +70,8 @@
                             <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE777;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="拖离边缘自动还原原始尺寸" FontWeight="Medium" FontSize="13.5" />
-                            <TextBlock Text="按住标题栏将已停靠边缘的窗口拖离边缘至屏幕任意区域，松开时窗口立即自动还原为停靠前的原始尺寸与状态，无缝衔接日常使用。" TextWrapping="Wrap" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,3,0,0" />
+                            <TextBlock Text="拖离边缘即刻还原原始尺寸" FontWeight="Medium" FontSize="13.5" />
+                            <TextBlock Text="按住标题栏拖动已停靠边缘的窗口，在移动的瞬间窗口立即自动还原为停靠前的原始尺寸与状态，方便跟随鼠标自由放置于屏幕任意位置。" TextWrapping="Wrap" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,3,0,0" />
                         </StackPanel>
                     </DockPanel>
                 </ui:SimpleStackPanel>

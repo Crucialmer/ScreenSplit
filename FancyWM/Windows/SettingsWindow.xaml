@@ -154,18 +154,6 @@
                                 </viewmodels:PageItem.Header>
                             </viewmodels:PageItem>
 
-                            <!-- Advanced -->
-                            <viewmodels:PageItem Page="{x:Type pages:AdvancedPage}">
-                                <viewmodels:PageItem.Header>
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Border Width="26" Height="26" CornerRadius="6" Background="#5856D6" Margin="0,0,10,0">
-                                            <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xF259;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                        </Border>
-                                        <TextBlock Text="{x:Static res:Strings.Advanced_Caption}" FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </viewmodels:PageItem.Header>
-                            </viewmodels:PageItem>
-
                             <!-- Help -->
                             <viewmodels:PageItem Page="{x:Type pages:HelpPage}">
                                 <viewmodels:PageItem.Header>

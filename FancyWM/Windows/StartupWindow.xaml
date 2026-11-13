@@ -189,8 +189,8 @@
                                 <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE777;" Foreground="White" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="离开边缘自动恢复原始状态" FontWeight="Medium" FontSize="13" Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}" />
-                                <TextBlock Text="按住标题栏将已停靠边缘的窗口拖离边缘至任意区域，松开时自动还原为停靠前的原始尺寸。" FontSize="11.5" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                                <TextBlock Text="离开边缘即刻恢复原始尺寸" FontWeight="Medium" FontSize="13" Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}" />
+                                <TextBlock Text="按住标题栏拖动已停靠边缘的窗口，在移动瞬间立即还原为原始尺寸，方便跟随鼠标自由放置。" FontSize="11.5" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
                             </StackPanel>
                         </DockPanel>
                     </Border>
