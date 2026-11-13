@@ -509,8 +509,8 @@ namespace FancyWM
                                 return (GetSnapRectangle(snapZone, wa), snapTitle);
                             }
 
-                            // 自由区：展示原始尺寸阴影色跟随光标，方便自由放置
-                            if (m_movingWindow != null)
+                            // 自由区：仅当从边缘/角落贴靠状态拖回自由区时，展示原始尺寸阴影框跟随光标；普通自由拖动时不显示任何阴影框
+                            if (m_movingWindow != null && m_isDraggingSnappedWindow)
                             {
                                 int targetW = m_currentDragTargetSize.X;
                                 int targetH = m_currentDragTargetSize.Y;
@@ -531,8 +531,7 @@ namespace FancyWM
                                 if (targetY < wa.Top) targetY = wa.Top;
                                 if (targetY + targetH > wa.Bottom) targetY = wa.Bottom - targetH;
 
-                                string title = m_isDraggingSnappedWindow ? "还原原始尺寸" : "自由放置";
-                                return (Rectangle.OffsetAndSize(targetX, targetY, targetW, targetH), title);
+                                return (Rectangle.OffsetAndSize(targetX, targetY, targetW, targetH), "还原原始尺寸");
                             }
                         }
 
@@ -1870,7 +1869,7 @@ namespace FancyWM
                 hasPreSnap = m_preSnapRectangles.TryGetValue(e.Source, out preSnapRect);
             }
 
-            if (wasSnapped)
+            if (wasSnapped || hasPreSnap)
             {
                 m_isDraggingSnappedWindow = true;
                 if (!hasPreSnap || preSnapRect.Width <= 0 || preSnapRect.Height <= 0)
