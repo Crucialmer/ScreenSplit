@@ -376,6 +376,14 @@ namespace FancyWM
                     {
                         if (!m_backend.HasWindow(window) && window.State == WindowState.Restored && CanManage(window))
                         {
+                            if (m_autoFloatNewWindows)
+                            {
+                                using (m_floatingSetLock.EnterScope())
+                                {
+                                    m_floatingSet.Add(window);
+                                }
+                                continue;
+                            }
                             m_logger.Debug("Discovered window {Window}", window.DebugString());
                             var newNode = m_backend.RegisterWindow(window, maxTreeWidth: m_autoSplitCount);
                             newNode.Parent!.Padding = GetPanelPaddingRect();

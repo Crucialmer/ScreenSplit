@@ -40,6 +40,7 @@ namespace FancyWM.ViewModels
         public int AutoSplitCount { get => m_autoSplitCount; set => SetField(ref m_autoSplitCount, value); }
 
         public bool DelayReposition { get => m_delayReposition; set => SetField(ref m_delayReposition, value); }
+        public bool AutoFloatNewWindows { get => m_autoFloatNewWindows; set => SetField(ref m_autoFloatNewWindows, value); }
         public bool AnimateWindowMovement { get => m_animateWindowMovement; set => SetField(ref m_animateWindowMovement, value); }
         public bool MouseAutoFocus
         {
@@ -202,6 +203,7 @@ namespace FancyWM.ViewModels
         private bool m_autoCollapsePanels;
         private int m_autoSplitCount;
         private bool m_delayReposition;
+        private bool m_autoFloatNewWindows;
         private bool m_customAccentColor;
         private bool m_animateWindowMovement;
         private bool m_mouseAutoFocus;
@@ -245,6 +247,7 @@ namespace FancyWM.ViewModels
                     AutoCollapsePanels = settings.AutoCollapsePanels;
                     AutoSplitCount = settings.AutoSplitCount;
                     DelayReposition = settings.DelayReposition;
+                    AutoFloatNewWindows = settings.AutoFloatNewWindows;
                     AnimateWindowMovement = settings.AnimateWindowMovement;
                     ModifierMoveWindow = settings.ModifierMoveWindow;
                     ModifierMoveWindowAutoFocus = settings.ModifierMoveWindowAutoFocus;
@@ -370,6 +373,7 @@ namespace FancyWM.ViewModels
                     AutoCollapsePanels = AutoCollapsePanels,
                     AutoSplitCount = AutoSplitCount,
                     DelayReposition = DelayReposition,
+                    AutoFloatNewWindows = AutoFloatNewWindows,
                     AnimateWindowMovement = AnimateWindowMovement,
                     ModifierMoveWindow = ModifierMoveWindow,
                     ModifierMoveWindowAutoFocus = ModifierMoveWindowAutoFocus,
@@ -394,7 +398,7 @@ namespace FancyWM.ViewModels
         {
             var buckets = new[]
             {
-                ("ScreenSplit", new HashSet<BindableAction>{
+                ("基础控制 (ScreenSplit)", new HashSet<BindableAction>{
                     BindableAction.ToggleManager,
                     BindableAction.ShowDesktop,
                     BindableAction.RefreshWorkspace,

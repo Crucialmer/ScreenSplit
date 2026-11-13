@@ -328,6 +328,19 @@ namespace FancyWM
                             {
                                 return m_backend.MockMoveWindow(window, pt, allowNesting: !isSwapping).preArrange;
                             }
+                            else if (isSwapping && CanManage(window, ignoreFloating: true))
+                            {
+                                var targetNode = m_backend.NodeAtPoint(m_workspace.VirtualDesktopManager.CurrentDesktop, pt);
+                                if (targetNode != null)
+                                {
+                                    return targetNode.ComputedRectangle;
+                                }
+                                var tree = m_backend.GetTree(m_workspace.VirtualDesktopManager.CurrentDesktop);
+                                if (tree?.Root != null)
+                                {
+                                    return tree.Root.ComputedRectangle;
+                                }
+                            }
                         }
                     }
                     else
@@ -1114,6 +1127,26 @@ namespace FancyWM
                     m_backend.MoveWindow(window, pt, allowNesting: !isSwapping);
                     m_backend.SetFocus(window);
                 }
+                else if (isSwapping && CanManage(window, ignoreFloating: true))
+                {
+                    m_logger.Information("User dragged floating window {Window} with Shift, registering into tiling backend at {Position}", window.DebugString(), pt);
+                    using (m_floatingSetLock.EnterScope())
+                    {
+                        m_floatingSet.Remove(window);
+                    }
+                    var newNode = m_backend.RegisterWindow(window, maxTreeWidth: m_autoSplitCount);
+                    newNode.Parent!.Padding = GetPanelPaddingRect();
+                    newNode.Parent!.Spacing = GetPanelSpacing();
+                    try
+                    {
+                        m_backend.MoveWindow(window, pt, allowNesting: false);
+                    }
+                    catch
+                    {
+                    }
+                    m_backend.SetFocus(window);
+                    InvalidateLayout();
+                }
             }
         }
 
@@ -1134,6 +1167,16 @@ namespace FancyWM
                 catch (TilingFailedException ex)
                 {
                     PlacementFailed?.Invoke(this, new TilingFailedEventArgs(ex.FailReason, e.Source));
+                }
+            }
+            else if (IsSwapModifierPressed() && CanManage(e.Source, ignoreFloating: true))
+            {
+                try
+                {
+                    DoWindowMove(e.Source);
+                }
+                catch
+                {
                 }
             }
 
@@ -1180,7 +1223,10 @@ namespace FancyWM
             {
                 if (!m_backend.HasWindow(e.Source))
                 {
-                    return;
+                    if (!IsSwapModifierPressed())
+                    {
+                        return;
+                    }
                 }
             }
 

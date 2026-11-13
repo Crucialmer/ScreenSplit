@@ -254,7 +254,7 @@ namespace FancyWM
 
             try
             {
-                m_notifyIcon.ShowBalloonTip("ScreenSplit", "分屏软件已在后台启动！\n快捷键：Win+Shift+H (左右切分)，Win+Shift+V (上下切分)", BalloonIcon.Info);
+                m_notifyIcon.ShowBalloonTip("ScreenSplit", "ScreenSplit 便携分屏已启动！\n• 新窗口默认保持浮动\n• 按住 Shift 拖动窗口可直接加入切分\n• 快捷键：Win+Shift+H / V", BalloonIcon.Info);
             }
             catch
             {
