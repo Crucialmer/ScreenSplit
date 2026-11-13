@@ -96,6 +96,13 @@ namespace FancyWM
             Services = services;
             Logger = services.GetRequiredService<ILogger>();
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
+            DispatcherUnhandledException += OnDispatcherUnhandledException;
+        }
+
+        private void OnDispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
+        {
+            Logger?.Error(e.Exception, "Unhandled dispatcher exception caught and suppressed");
+            e.Handled = true;
         }
 
         protected override void OnStartup(StartupEventArgs e)

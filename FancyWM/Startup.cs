@@ -32,6 +32,8 @@ namespace FancyWM
 
         private static event Action? ProgramExit;
 
+        private static Mutex? s_singleInstanceMutex;
+
         private const string LogFile = "screensplit.log";
 
         private static bool IsPackaged
@@ -127,14 +129,24 @@ Type 'ScreenSplit --help' from anywhere after installation.
                 }
             }
 
-            // Check if other instances are running
-            var exists = Process.GetProcessesByName(Process.GetCurrentProcess().ProcessName)
-                .Where(x => x.MainWindowHandle != IntPtr.Zero)
-                .Any();
-            if (exists)
+            // Check if another instance is already running using system-wide Mutex
+            const string mutexName = @"Local\ScreenSplit_SingleInstance_Mutex_Crucialmer";
+            s_singleInstanceMutex = new Mutex(true, mutexName, out bool isInitialInstance);
+            if (!isInitialInstance)
             {
-                MessageBox.Show(Strings.About_AlreadyRunning, "ScreenSplit", MessageBoxButton.OK, MessageBoxImage.Error);
-                return 1;
+                // Another instance is already running! Gently wake up the existing instance and exit cleanly
+                try
+                {
+                    var hwnd = PInvoke.FindWindow(null, "ScreenSplitMainWindow").Value;
+                    if (hwnd != IntPtr.Zero)
+                    {
+                        WindowCopyDataHelper.Send(hwnd, Encoding.Default.GetBytes("OpenSettings"));
+                    }
+                }
+                catch
+                {
+                }
+                return 0;
             }
 
             // Parse command line
@@ -195,6 +207,14 @@ Type 'ScreenSplit --help' from anywhere after installation.
             }
             finally
             {
+                try
+                {
+                    s_singleInstanceMutex?.Dispose();
+                }
+                catch
+                {
+                }
+
                 // Write crash log if needed
                 if (!exitNormally)
                 {

@@ -127,7 +127,7 @@ namespace FancyWM.Utilities
                 }
                 catch (Exception e)
                 {
-                    App.Current.Logger.Warning(e, "Exception thrown while restoring the original window layout!");
+                    App.Current.Logger.Debug(e, "FauxMicaProvider wallpaper background acquisition skipped or failed");
                     return;
                 }
             }

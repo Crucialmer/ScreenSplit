@@ -636,6 +636,12 @@ namespace FancyWM
 
         private async Task ExecuteActionFromStringAsync(string actionName)
         {
+            if (string.Equals(actionName, "OpenSettings", StringComparison.OrdinalIgnoreCase))
+            {
+                OpenSettings();
+                return;
+            }
+
             BindableAction action;
             try
             {
@@ -938,9 +944,23 @@ namespace FancyWM
 
         internal static void OpenSettings()
         {
-            if (App.Current.Windows.OfType<SettingsWindow>().Any())
+            if (App.Current.Windows.OfType<StartupWindow>().FirstOrDefault() is StartupWindow startupWindow)
             {
-                App.Current.Windows.OfType<SettingsWindow>().First().Activate();
+                if (startupWindow.WindowState == System.Windows.WindowState.Minimized)
+                {
+                    startupWindow.WindowState = System.Windows.WindowState.Normal;
+                }
+                startupWindow.Activate();
+                return;
+            }
+
+            if (App.Current.Windows.OfType<SettingsWindow>().FirstOrDefault() is SettingsWindow settingsWindow)
+            {
+                if (settingsWindow.WindowState == System.Windows.WindowState.Minimized)
+                {
+                    settingsWindow.WindowState = System.Windows.WindowState.Normal;
+                }
+                settingsWindow.Activate();
             }
             else
             {
