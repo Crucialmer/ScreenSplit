@@ -102,15 +102,16 @@ namespace FancyWM
         {
             base.OnStartup(e);
 
+            var asm = typeof(App).Assembly.GetName().Name;
             if (Environment.OSVersion.Version.Build >= 22000)
             {
-                Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("/FancyWM;component/Themes/Fluent/Rounded.xaml", UriKind.RelativeOrAbsolute) });
+                Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri($"/{asm};component/Themes/Fluent/Rounded.xaml", UriKind.RelativeOrAbsolute) });
             }
             else
             {
-                Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("/FancyWM;component/Themes/Fluent/Squared.xaml", UriKind.RelativeOrAbsolute) });
+                Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri($"/{asm};component/Themes/Fluent/Squared.xaml", UriKind.RelativeOrAbsolute) });
             }
-            Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("/FancyWM;component/Themes/Fluent/Generic.xaml", UriKind.RelativeOrAbsolute) });
+            Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri($"/{asm};component/Themes/Fluent/Generic.xaml", UriKind.RelativeOrAbsolute) });
         }
 
         internal string GetRealPath(string path)

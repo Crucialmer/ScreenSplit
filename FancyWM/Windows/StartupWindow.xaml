@@ -21,7 +21,7 @@
         ui:ThemeManager.IsThemeAware="True">
     <DockPanel LastChildFill="True">
         <Border DockPanel.Dock="Left" Margin="15">
-            <Image Width="128" Height="128" Source="../Resources/Icon.ico" />
+            <Image Width="128" Height="128" Source="/Resources/Icon.ico" />
         </Border>
         <ui:SimpleStackPanel Orientation="Vertical" Margin="16" Spacing="16">
             <TextBlock Style="{DynamicResource TitleTextBlockStyle}">

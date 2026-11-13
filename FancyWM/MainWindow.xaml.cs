@@ -221,14 +221,44 @@ namespace FancyWM
                     .Subscribe(new NotifyUnhandledObserver<Unit>()),
             ];
 
+            System.Drawing.Icon? appIcon = null;
+            try
+            {
+                appIcon = Files.Icon;
+            }
+            catch (Exception ex)
+            {
+                m_logger.Warning(ex, "Failed to load Files.Icon");
+            }
+
+            if (appIcon == null && !string.IsNullOrEmpty(Environment.ProcessPath))
+            {
+                try
+                {
+                    appIcon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath);
+                }
+                catch
+                {
+                }
+            }
+
             m_notifyIcon = new TaskbarIcon
             {
-                Icon = Files.Icon
+                Icon = appIcon ?? System.Drawing.SystemIcons.Application,
+                ToolTipText = "ScreenSplit (分屏管理器)",
+                Visibility = Visibility.Visible,
             };
             m_notifyIcon.TrayLeftMouseDown += OnNotifyIconLeftMouseDown;
             m_notifyIcon.TrayRightMouseDown += OnNotifyIconRightMouseDown;
-            m_notifyIcon.Visibility = Visibility.Visible;
             m_notifyIcon.TrayBalloonTipClicked += OnBalloonTipClicked;
+
+            try
+            {
+                m_notifyIcon.ShowBalloonTip("ScreenSplit", "分屏软件已在后台启动！\n快捷键：Win+Shift+H (左右切分)，Win+Shift+V (上下切分)", BalloonIcon.Info);
+            }
+            catch
+            {
+            }
 
             m_hideCountdownTimer = new CountdownTimer();
             m_contextMenu = (ContextMenu)FindResource("NotifierContextMenu");

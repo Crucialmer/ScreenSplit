@@ -291,8 +291,7 @@ Type 'FancyWM --help' from anywhere after installation.
                 logFileName,
                 restrictedToMinimumLevel: args.LogLevel,
                 fileSizeLimitBytes: 4 * 1024 * 1024,
-                buffered: true,
-                flushToDiskInterval: TimeSpan.FromSeconds(5));
+                buffered: false);
 
             var logBuffer = new CircularBuffer<string>(1000);
             var lineWriter = new LineWriter(logBuffer, '\n');
