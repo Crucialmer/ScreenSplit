@@ -26,6 +26,11 @@
                     <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE895;" FontSize="13" />
                 </MenuItem.Icon>
             </MenuItem>
+            <MenuItem Header="恢复系统原生贴靠 (Aero Snap)" Click="OnRestoreSystemSnapClick">
+                <MenuItem.Icon>
+                    <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE737;" FontSize="13" />
+                </MenuItem.Icon>
+            </MenuItem>
             <Separator />
             <MenuItem Header="{x:Static res:Strings.Quit}" Click="OnExitClick">
                 <MenuItem.Icon>

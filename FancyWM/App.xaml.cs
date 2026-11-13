@@ -153,6 +153,10 @@ namespace FancyWM
 
         internal void Terminate()
         {
+            foreach (var win in Windows.OfType<MainWindow>())
+            {
+                win.IsTerminating = true;
+            }
             Close();
             Shutdown();
         }

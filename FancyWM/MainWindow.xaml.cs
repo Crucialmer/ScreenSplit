@@ -282,19 +282,11 @@ namespace FancyWM
 
         private UnmanagedResourceGuard? ApplySystemParameters()
         {
-            bool windowArranging;
-            try
-            {
-                windowArranging = SystemParameters.Instance.WindowArranging;
-                SystemParameters.Instance.WindowArranging = false;
-            }
-            catch
-            {
-                return null;
-            }
+            SystemSnapManager.Initialize();
+            SystemSnapManager.DisableWhileRunning();
             return new(() =>
             {
-                SystemParameters.Instance.WindowArranging = windowArranging;
+                SystemSnapManager.RestoreSystemSnap();
             });
         }
 
@@ -1578,10 +1570,18 @@ namespace FancyWM
             }
         }
 
+        private async void OnRestoreSystemSnapClick(object? sender, RoutedEventArgs e)
+        {
+            m_contextMenu.IsOpen = false;
+            SystemSnapManager.RestoreSystemSnap();
+            await ShowToastAsync("Windows 原生贴靠 (Aero Snap) 已恢复启用！", ToastDurationLong);
+        }
+
         private void OnExitClick(object? sender, RoutedEventArgs e)
         {
             m_logger.Debug("Application exit requested!");
             m_contextMenu.IsOpen = false;
+            SystemSnapManager.RestoreSystemSnap();
             App.Current.Terminate();
         }
 
@@ -1597,16 +1597,22 @@ namespace FancyWM
             new AboutWindow().Show();
         }
 
+        internal bool IsTerminating { get; set; } = false;
+
         protected override void OnClosing(CancelEventArgs e)
         {
             base.OnClosing(e);
-            e.Cancel = true;
+            if (!IsTerminating)
+            {
+                e.Cancel = true;
+            }
         }
 
 #pragma warning disable CA1816 // Dispose methods should call SuppressFinalize
         public void Dispose()
 #pragma warning restore CA1816 // Dispose methods should call SuppressFinalize
         {
+            SystemSnapManager.RestoreSystemSnap();
             m_unmanagedResourceGuard?.Dispose();
 
             m_workspace.VirtualDesktopManager.CurrentDesktopChanged -= OnVirtualDesktopChanged;

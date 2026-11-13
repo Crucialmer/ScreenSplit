@@ -173,6 +173,9 @@ Type 'ScreenSplit --help' from anywhere after installation.
             });
 
             ProgramExit += OnProgramExit;
+            ProgramExit += SystemSnapManager.RestoreSystemSnap;
+            CrashCleanup += SystemSnapManager.RestoreSystemSnap;
+            SystemSnapManager.Initialize();
 
             var provider = serviceCollection.BuildServiceProvider();
 
