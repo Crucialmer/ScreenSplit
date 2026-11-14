@@ -22,7 +22,7 @@
                                     <DropShadowEffect BlurRadius="4" ShadowDepth="0" Color="#10B981" Opacity="0.8" />
                                 </Ellipse.Effect>
                             </Ellipse>
-                            <TextBlock Text="ScreenSplit  v1.0.8" FontWeight="SemiBold" FontSize="12.5" Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}" />
+                            <TextBlock Text="ScreenSplit  v1.0.9" FontWeight="SemiBold" FontSize="12.5" Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}" />
                         </StackPanel>
                         <TextBlock Text="纯绿色便携 · 边缘智能吸附分屏" FontSize="11" Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}" Margin="15,3,0,0" />
                     </StackPanel>

@@ -188,7 +188,7 @@ namespace FancyWM
         private readonly IAnimationThread m_animationThread;
         private int m_panelHeight = 0;
         private int m_windowPadding = 2;
-        private bool m_showFocus = true;
+        private bool m_showFocus = false;
         private bool m_showPreviewFocus = false;
         private CancellationTokenSource? m_focusSettleCts;
         private IWindow? m_currentFocusedTarget;

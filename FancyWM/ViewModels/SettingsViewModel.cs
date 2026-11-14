@@ -224,7 +224,7 @@ namespace FancyWM.ViewModels
         private bool m_multiMonitorSupport;
         private bool m_showContextHints;
         private bool m_soundOnFailure;
-        private bool m_showFocus = true;
+        private bool m_showFocus = false;
         private bool m_showFocusDuringAction;
         private readonly ILogger m_logger = App.Current.Logger;
 

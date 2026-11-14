@@ -456,9 +456,9 @@ Type 'ScreenSplit --help' from anywhere after installation.
             if (!string.IsNullOrEmpty(path))
             {
                 var versionInfo = FileVersionInfo.GetVersionInfo(path);
-                return versionInfo.FileVersion ?? "1.0.8.0";
+                return versionInfo.FileVersion ?? "1.0.9.0";
             }
-            return "1.0.8.0";
+            return "1.0.9.0";
         }
 
         private static bool IsAdministrator()

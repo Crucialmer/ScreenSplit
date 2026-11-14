@@ -17,19 +17,6 @@
 
             <TextBlock Text="{x:Static res:Strings.Interface_Caption}" Style="{DynamicResource TitleTextBlockStyle}" Margin="0, 0, 0, 20" />
             
-            <TextBlock Text="{x:Static res:Strings.Interface_Visuals}" Style="{DynamicResource SubtitleTextBlockStyle}" Margin="0, 20" />
-
-            <Border Style="{DynamicResource SettingsItemStyle}">
-                <StackPanel>
-                    <DockPanel LastChildFill="True">
-                        <CheckBox DockPanel.Dock="Right" IsChecked="{Binding Path=ShowFocus, Mode=TwoWay}" />
-                        <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.Interface_ShowFocus}" Margin="0,0,16,0" />
-                    </DockPanel>
-                    <TextBlock TextWrapping="WrapWithOverflow" Padding="0,16,0,0" VerticalAlignment="Center" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}">
-                    <Run Text="{x:Static res:Strings.Interface_ShowFocus_Description}" />
-                    </TextBlock>
-                </StackPanel>
-            </Border>
 
             <TextBlock Text="{x:Static res:Strings.Interface_Sizes}" Style="{DynamicResource SubtitleTextBlockStyle}" Margin="0, 20" />
 

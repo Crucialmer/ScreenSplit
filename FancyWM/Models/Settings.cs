@@ -65,7 +65,7 @@ namespace FancyWM.Models
 
         public int PanelFontSize { get; init; } = 12;
 
-        public bool ShowFocus { get; init; } = true;
+        public bool ShowFocus { get; init; } = false;
 
         public bool ShowFocusDuringAction { get; init; } = true;
 
