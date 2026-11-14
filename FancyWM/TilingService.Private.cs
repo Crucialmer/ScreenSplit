@@ -881,7 +881,7 @@ namespace FancyWM
             var pt = m_workspace.CursorLocation;
 
             // 实时检测鼠标主按键是否松开（通过直接检测物理按键状态，支持左右手鼠标配置）
-            if ((PInvoke.GetAsyncKeyState(1) & 0x8000) == 0 && (PInvoke.GetAsyncKeyState(2) & 0x8000) == 0)
+            if (!m_isExternalDrag && (PInvoke.GetAsyncKeyState(1) & 0x8000) == 0 && (PInvoke.GetAsyncKeyState(2) & 0x8000) == 0)
             {
                 StopDragTrackingTimer();
                 if (m_movingWindow != null)
@@ -903,6 +903,150 @@ namespace FancyWM
             m_lastPreviewCursor = pt;
 
             UpdateDragPreview(pt);
+        }
+
+        private void OnExternalDragMouseButtonStateChanged(object? sender, ref LowLevelMouseHook.ButtonStateChangedEventArgs e)
+        {
+            if (m_isExternalDrag && m_movingWindow != null)
+            {
+                if (e.Button == LowLevelMouseHook.MouseButton.Left || e.Button == LowLevelMouseHook.MouseButton.Right)
+                {
+                    _ = m_dispatcher.InvokeAsync(EndExternalDrag);
+                }
+            }
+        }
+
+        private void OnExternalDragWatchdogTick(object? sender, EventArgs e)
+        {
+            if (!m_isExternalDrag || m_movingWindow == null)
+            {
+                m_externalDragWatchdogTimer.Stop();
+                return;
+            }
+
+            if (m_sw.Elapsed - m_lastExternalDragTime > TimeSpan.FromMilliseconds(1500))
+            {
+                m_logger.Information("[Drag] External drag timed out after 1500ms of inactivity");
+                EndExternalDrag();
+            }
+        }
+
+        private void StartExternalDrag(IWindow window, Rectangle pos, Point cursor)
+        {
+            m_logger.Information("[Drag] StartExternalDrag on {Window}, Pos={Pos}, Cursor={Cursor}", window.DebugString(), pos, cursor);
+
+            using (m_ignoreRepositionSetLock.EnterScope())
+            {
+                m_ignoreRepositionSet.Add(window);
+            }
+            m_movingWindow = window;
+            m_currentInteraction = UserInteraction.Moving;
+            m_isExternalDrag = true;
+            m_lastExternalDragTime = m_sw.Elapsed;
+
+            if (pos.Width > 0)
+            {
+                m_dragGrabRatioX = Math.Clamp((cursor.X - pos.Left) / (double)pos.Width, 0.1, 0.9);
+            }
+            else
+            {
+                m_dragGrabRatioX = 0.5;
+            }
+
+            if (pos.Height > 0)
+            {
+                m_dragGrabRatioY = Math.Clamp((cursor.Y - pos.Top) / (double)pos.Height, 0.05, 0.95);
+            }
+            else
+            {
+                m_dragGrabRatioY = 0.1;
+            }
+
+            var wa = m_display.WorkArea;
+            bool wasSnapped = IsWindowSnapped(window, pos, wa);
+            Rectangle preSnapRect = default;
+            bool hasPreSnap = false;
+
+            using (m_preSnapRectanglesLock.EnterScope())
+            {
+                hasPreSnap = m_preSnapRectangles.TryGetValue(window, out preSnapRect);
+                if (!wasSnapped)
+                {
+                    m_activeDragOriginalRect[window] = pos;
+                }
+            }
+
+            if (wasSnapped)
+            {
+                m_isDraggingSnappedWindow = true;
+                if (!hasPreSnap || preSnapRect.Width <= 0 || preSnapRect.Height <= 0)
+                {
+                    bool isPortrait = pos.Width > 0 && pos.Height > 0 && pos.Width < pos.Height;
+                    int defaultW = isPortrait ? (int)(wa.Height * 0.45) : (int)(wa.Width * 0.60);
+                    int defaultH = isPortrait ? (int)(wa.Height * 0.75) : (int)(wa.Height * 0.65);
+                    preSnapRect = Rectangle.OffsetAndSize(
+                        wa.Left + (wa.Width - defaultW) / 2,
+                        wa.Top + (wa.Height - defaultH) / 2,
+                        defaultW, defaultH);
+                    using (m_preSnapRectanglesLock.EnterScope())
+                    {
+                        m_preSnapRectangles[window] = preSnapRect;
+                    }
+                }
+                m_currentDragTargetSize = new Point(preSnapRect.Width, preSnapRect.Height);
+            }
+            else
+            {
+                m_isDraggingSnappedWindow = false;
+                m_currentDragTargetSize = new Point(pos.Width, pos.Height);
+            }
+
+            StartDragTrackingTimer();
+            m_externalDragWatchdogTimer.Start();
+            UpdateDragPreview(cursor);
+        }
+
+        private void EndExternalDrag()
+        {
+            if (!m_isExternalDrag || m_movingWindow == null)
+                return;
+
+            var win = m_movingWindow;
+            m_movingWindow = null;
+            m_isExternalDrag = false;
+            m_potentialExternalDragWindow = null;
+            m_externalDragFrameCount = 0;
+
+            m_externalDragWatchdogTimer.Stop();
+            StopDragTrackingTimer();
+            m_lastPreviewCursor = new Point(-99999, -99999);
+            SetPreviewRectangle(null, null);
+
+            m_logger.Information("[Drag] EndExternalDrag on {Window}", win.DebugString());
+
+            try
+            {
+                DoWindowMove(win);
+            }
+            catch (Exception ex)
+            {
+                m_logger.Warning(ex, "Error handling external drag move end for {Window}", win.DebugString());
+            }
+            finally
+            {
+                m_currentInteraction = UserInteraction.None;
+                m_isDraggingTitleBar = false;
+                m_isDraggingSnappedWindow = false;
+
+                m_dispatcher.InvokeAsync(async () =>
+                {
+                    await Task.Delay(100);
+                    using (m_ignoreRepositionSetLock.EnterScope())
+                    {
+                        m_ignoreRepositionSet.Remove(win);
+                    }
+                });
+            }
         }
 
         private void MoveToParentPanel(TilingNode node)
@@ -1910,6 +2054,45 @@ namespace FancyWM
             {
                 if (!m_ignoreRepositionSet.Contains(e.Source))
                 {
+                    // Check if this could be an external drag (e.g. Quicker / SetWindowPos mover)
+                    if (m_currentInteraction == UserInteraction.None && m_movingWindow == null)
+                    {
+                        var cursor = m_workspace.CursorLocation;
+                        bool isSizePreservedExternal = Math.Abs(e.OldPosition.Width - e.NewPosition.Width) <= 10 &&
+                                                       Math.Abs(e.OldPosition.Height - e.NewPosition.Height) <= 10;
+                        int winDx = e.NewPosition.Left - e.OldPosition.Left;
+                        int winDy = e.NewPosition.Top - e.OldPosition.Top;
+                        bool isPositionChanged = (winDx != 0 || winDy != 0);
+
+                        // Cursor is inside or very close to the moving window
+                        bool isCursorInsideWindow = cursor.X >= e.NewPosition.Left - 80 &&
+                                                    cursor.X <= e.NewPosition.Right + 80 &&
+                                                    cursor.Y >= e.NewPosition.Top - 80 &&
+                                                    cursor.Y <= e.NewPosition.Bottom + 80;
+
+                        if (isSizePreservedExternal && isPositionChanged && isCursorInsideWindow)
+                        {
+                            if (Equals(m_potentialExternalDragWindow, e.Source) && (m_sw.Elapsed - m_lastExternalDragTime) <= TimeSpan.FromMilliseconds(250))
+                            {
+                                m_externalDragFrameCount++;
+                                m_lastExternalDragTime = m_sw.Elapsed;
+
+                                if (m_externalDragFrameCount >= 2)
+                                {
+                                    // Confirmed external drag!
+                                    StartExternalDrag(e.Source, e.NewPosition, cursor);
+                                    return;
+                                }
+                            }
+                            else
+                            {
+                                m_potentialExternalDragWindow = e.Source;
+                                m_externalDragFrameCount = 1;
+                                m_lastExternalDragTime = m_sw.Elapsed;
+                            }
+                        }
+                    }
+
                     // Some other event might have resulted in the movement of the window.
                     // Do not call DetectChanges under the lock, to avoid deadlock.
                     m_dispatcher.InvokeAsync(() =>
@@ -1924,13 +2107,18 @@ namespace FancyWM
                 }
             }
 
+            if (m_isExternalDrag && Equals(m_movingWindow, e.Source))
+            {
+                m_lastExternalDragTime = m_sw.Elapsed;
+            }
+
             bool isSizePreserved = Math.Abs(e.OldPosition.Width - e.NewPosition.Width) <= 5 &&
                                    Math.Abs(e.OldPosition.Height - e.NewPosition.Height) <= 5;
 
             if (m_currentInteraction == UserInteraction.Starting || m_currentInteraction == UserInteraction.Moving)
             {
-                // Only consider it a manual border resize if not dragging a snapped window and not dragging by title bar
-                if (!m_isDraggingSnappedWindow && !m_isDraggingTitleBar && !isSizePreserved)
+                // Only consider it a manual border resize if not dragging a snapped window and not dragging by title bar and not an external drag
+                if (!m_isDraggingSnappedWindow && !m_isDraggingTitleBar && !m_isExternalDrag && !isSizePreserved)
                 {
                     m_currentInteraction = UserInteraction.Resizing;
                     StopDragTrackingTimer();

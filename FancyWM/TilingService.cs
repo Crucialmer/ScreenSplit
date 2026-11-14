@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Threading;
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.DependencyInjection;
 
 using FancyWM.Layouts.Tiling;
 using FancyWM.Utilities;
@@ -184,6 +185,11 @@ namespace FancyWM
         private bool m_isDraggingSnappedWindow = false;
         private WinMan.Point m_currentDragTargetSize = default;
         private readonly DispatcherTimer m_dragTrackingTimer;
+        private bool m_isExternalDrag = false;
+        private IWindow? m_potentialExternalDragWindow = null;
+        private int m_externalDragFrameCount = 0;
+        private TimeSpan m_lastExternalDragTime = TimeSpan.Zero;
+        private readonly DispatcherTimer m_externalDragWatchdogTimer;
 
         private readonly CompositeDisposable m_subscriptions = [];
         private readonly IAnimationThread m_animationThread;
@@ -271,6 +277,14 @@ namespace FancyWM
             {
                 IsEnabled = false
             };
+            m_externalDragWatchdogTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(50), DispatcherPriority.Normal, OnExternalDragWatchdogTick, m_dispatcher)
+            {
+                IsEnabled = false
+            };
+            if (App.Current.Services.GetService<LowLevelMouseHook>() is LowLevelMouseHook mshk)
+            {
+                mshk.ButtonStateChanged += OnExternalDragMouseButtonStateChanged;
+            }
             m_gui = new TilingOverlayRenderer(display, GetOverlayAnchor)
             {
                 PanelSpacing = GetPanelSpacing(),
@@ -666,6 +680,11 @@ namespace FancyWM
 
             m_active = false;
             StopDragTrackingTimer();
+            m_externalDragWatchdogTimer.Stop();
+            if (App.Current.Services.GetService<LowLevelMouseHook>() is LowLevelMouseHook mshk)
+            {
+                mshk.ButtonStateChanged -= OnExternalDragMouseButtonStateChanged;
+            }
             m_focusSettleCts?.Cancel();
             m_focusSettleCts?.Dispose();
             m_focusSettleCts = null;
