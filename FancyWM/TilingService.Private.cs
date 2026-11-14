@@ -742,6 +742,21 @@ namespace FancyWM
             return null;
         }
 
+        private static bool IsValidFloatingDimensions(int w, int h, Rectangle wa)
+        {
+            if (w < 120 || h < 100) return false;
+            // 仅排除同时占据全屏宽与全屏高的真最大化窗口（非最大化的高窗口或宽窗口均属于合法浮动窗口）
+            if (w >= wa.Width - 15 && h >= wa.Height - 15) return false;
+            return true;
+        }
+
+        private static bool IsValidFloatingRect(Rectangle rect, Rectangle wa)
+        {
+            if (!IsValidFloatingDimensions(rect.Width, rect.Height, wa)) return false;
+            if (IsWindowSnappedGeometry(rect, wa)) return false;
+            return true;
+        }
+
         private Rectangle GetBestFloatingRectangle(IWindow window, Rectangle wa, Rectangle fallbackPos)
         {
             // 1. Check Win32 HWND Property (SetProp / GetProp) - 硬件级窗口属性持久化
@@ -752,8 +767,7 @@ namespace FancyWM
                 {
                     int propW = (int)(long)GetProp(hwnd, "SS_FloatW");
                     int propH = (int)(long)GetProp(hwnd, "SS_FloatH");
-                    if (propW > 120 && propH > 100 &&
-                        propW < wa.Width * 0.88 && propH < wa.Height * 0.88)
+                    if (IsValidFloatingDimensions(propW, propH, wa))
                     {
                         int propX = (int)(long)GetProp(hwnd, "SS_FloatX");
                         int propY = (int)(long)GetProp(hwnd, "SS_FloatY");
@@ -771,9 +785,7 @@ namespace FancyWM
 
             // 2. Check Raw HWND In-Memory Cache
             if (s_hwndFloatingMemory.TryGetValue(window.Handle, out var hwndRect) &&
-                hwndRect.Width > 120 && hwndRect.Height > 100 &&
-                hwndRect.Width < wa.Width * 0.88 && hwndRect.Height < wa.Height * 0.88 &&
-                !IsWindowSnappedGeometry(hwndRect, wa))
+                IsValidFloatingRect(hwndRect, wa))
             {
                 return hwndRect;
             }
@@ -782,9 +794,7 @@ namespace FancyWM
             using (m_preSnapRectanglesLock.EnterScope())
             {
                 if (m_preSnapRectangles.TryGetValue(window, out var preRect) &&
-                    preRect.Width > 120 && preRect.Height > 100 &&
-                    preRect.Width < wa.Width * 0.88 && preRect.Height < wa.Height * 0.88 &&
-                    !IsWindowSnappedGeometry(preRect, wa))
+                    IsValidFloatingRect(preRect, wa))
                 {
                     return preRect;
                 }
@@ -794,9 +804,7 @@ namespace FancyWM
             using (m_preSnapRectanglesLock.EnterScope())
             {
                 if (m_activeDragOriginalRect.TryGetValue(window, out var origRect) &&
-                    origRect.Width > 120 && origRect.Height > 100 &&
-                    origRect.Width < wa.Width * 0.88 && origRect.Height < wa.Height * 0.88 &&
-                    !IsWindowSnappedGeometry(origRect, wa))
+                    IsValidFloatingRect(origRect, wa))
                 {
                     return origRect;
                 }
@@ -806,9 +814,7 @@ namespace FancyWM
             using (m_lastFloatingRectanglesLock.EnterScope())
             {
                 if (m_lastFloatingRectangles.TryGetValue(window, out var lastFloat) &&
-                    lastFloat.Width > 120 && lastFloat.Height > 100 &&
-                    lastFloat.Width < wa.Width * 0.88 && lastFloat.Height < wa.Height * 0.88 &&
-                    !IsWindowSnappedGeometry(lastFloat, wa))
+                    IsValidFloatingRect(lastFloat, wa))
                 {
                     return lastFloat;
                 }
@@ -821,8 +827,7 @@ namespace FancyWM
                 try { procName = window.GetProcess()?.ProcessName?.ToLowerInvariant() ?? ""; } catch { }
                 if (!string.IsNullOrEmpty(procName) && s_processFloatingMemory.TryGetValue(procName, out var procSize))
                 {
-                    if (procSize.Width > 120 && procSize.Height > 100 &&
-                        procSize.Width < wa.Width * 0.88 && procSize.Height < wa.Height * 0.88)
+                    if (IsValidFloatingDimensions(procSize.Width, procSize.Height, wa))
                     {
                         int targetX = wa.Left + (wa.Width - procSize.Width) / 2;
                         int targetY = wa.Top + (wa.Height - procSize.Height) / 2;
@@ -834,10 +839,7 @@ namespace FancyWM
 
             // 7. Check Windows OS placement rcNormalPosition
             var wpRect = GetWindowRestoredRectangle(window);
-            if (wpRect.HasValue &&
-                wpRect.Value.Width > 120 && wpRect.Value.Height > 100 &&
-                wpRect.Value.Width < wa.Width * 0.88 && wpRect.Value.Height < wa.Height * 0.88 &&
-                !IsWindowSnappedGeometry(wpRect.Value, wa))
+            if (wpRect.HasValue && IsValidFloatingRect(wpRect.Value, wa))
             {
                 return wpRect.Value;
             }
@@ -1178,26 +1180,35 @@ namespace FancyWM
 
                 var realFloatRect = Rectangle.OffsetAndSize(targetX, targetY, targetW, targetH);
                 ApplyWindowSnap(window, realFloatRect);
+                PInvoke.SetWindowPos(
+                    new(window.Handle),
+                    new(),
+                    realFloatRect.Left, realFloatRect.Top, realFloatRect.Width, realFloatRect.Height,
+                    SetWindowPos_uFlags.SWP_NOZORDER | SetWindowPos_uFlags.SWP_NOACTIVATE);
 
-                // 窗口已经还原为自由浮动大小，从贴靠集合中移除
+                // 保持拖出标记与原始大小记录，供后续自由释放或重新贴靠使用
                 using (m_snappedWindowsLock.EnterScope())
                 {
                     m_snappedWindows.Remove(window);
                 }
                 using (m_preSnapRectanglesLock.EnterScope())
                 {
-                    m_preSnapRectangles.Remove(window);
+                    m_preSnapRectangles[window] = preSnapRect;
                 }
-                m_isDraggingSnappedWindow = false;
+                using (m_lastFloatingRectanglesLock.EnterScope())
+                {
+                    m_lastFloatingRectangles[window] = preSnapRect;
+                }
+                RecordFloatingMemory(window, preSnapRect);
+
+                m_isDraggingSnappedWindow = true;
                 SetPreviewRectangle(null, null);
             }
             else
             {
                 m_isDraggingSnappedWindow = false;
                 var origRect = initialPos.Width > 0 ? initialPos : pos;
-                if (origRect.Width > 120 && origRect.Height > 100 &&
-                    origRect.Width < wa.Width * 0.88 && origRect.Height < wa.Height * 0.88 &&
-                    !IsWindowSnappedGeometry(origRect, wa))
+                if (IsValidFloatingRect(origRect, wa))
                 {
                     using (m_preSnapRectanglesLock.EnterScope())
                     {
@@ -2053,9 +2064,7 @@ namespace FancyWM
                     using (m_preSnapRectanglesLock.EnterScope())
                     {
                         if (m_activeDragOriginalRect.TryGetValue(window, out var origDragRect) &&
-                            origDragRect.Width > 120 && origDragRect.Height > 100 &&
-                            origDragRect.Width < wa.Width * 0.88 && origDragRect.Height < wa.Height * 0.88 &&
-                            !IsWindowSnappedGeometry(origDragRect, wa))
+                            IsValidFloatingRect(origDragRect, wa))
                         {
                             m_preSnapRectangles[window] = origDragRect;
                             using (m_lastFloatingRectanglesLock.EnterScope())
@@ -2133,12 +2142,11 @@ namespace FancyWM
                 int targetW = preSnapRect.Width;
                 int targetH = preSnapRect.Height;
 
-                if ((targetW >= wa.Width * 0.88 && targetH >= wa.Height * 0.88) ||
-                    targetH >= wa.Height * 0.95 ||
+                if (!IsValidFloatingDimensions(targetW, targetH, wa) ||
                     IsWindowSnappedGeometry(preSnapRect, wa))
                 {
                     var best = GetBestFloatingRectangle(window, wa, GetVisibleWindowRectangle(window));
-                    if (!IsWindowSnappedGeometry(best, wa) && best.Width < wa.Width * 0.88 && best.Height < wa.Height * 0.88)
+                    if (IsValidFloatingRect(best, wa))
                     {
                         targetW = best.Width;
                         targetH = best.Height;
@@ -2163,6 +2171,11 @@ namespace FancyWM
 
                 var restoredRect = Rectangle.OffsetAndSize(targetX, targetY, targetW, targetH);
                 ApplyWindowSnap(window, restoredRect);
+                PInvoke.SetWindowPos(
+                    new(window.Handle),
+                    new(),
+                    restoredRect.Left, restoredRect.Top, restoredRect.Width, restoredRect.Height,
+                    SetWindowPos_uFlags.SWP_NOZORDER | SetWindowPos_uFlags.SWP_NOACTIVATE);
 
                 // 持续保留该真实浮动大小记忆，供后续再次贴靠或拖出使用
                 using (m_lastFloatingRectanglesLock.EnterScope())
@@ -2178,6 +2191,29 @@ namespace FancyWM
                     m_snappedWindows.Remove(window);
                 }
                 RecordFloatingMemory(window, restoredRect);
+
+                // ⭐ 核心防覆写 Watchdog：延迟 40ms 确保 Quicker 等外部工具在松手退出循环时的残余位置更新不会覆盖恢复后的尺寸！
+                var capturedRestoredRect = restoredRect;
+                m_dispatcher.InvokeAsync(async () =>
+                {
+                    await Task.Delay(40);
+                    try
+                    {
+                        var curRect = GetVisibleWindowRectangle(window);
+                        if ((curRect.Width >= wa.Width * 0.45 && curRect.Height >= wa.Height * 0.45) ||
+                            Math.Abs(curRect.Width - capturedRestoredRect.Width) > 30 ||
+                            Math.Abs(curRect.Height - capturedRestoredRect.Height) > 30)
+                        {
+                            ApplyWindowSnap(window, capturedRestoredRect);
+                            PInvoke.SetWindowPos(
+                                new(window.Handle),
+                                new(),
+                                capturedRestoredRect.Left, capturedRestoredRect.Top, capturedRestoredRect.Width, capturedRestoredRect.Height,
+                                SetWindowPos_uFlags.SWP_NOZORDER | SetWindowPos_uFlags.SWP_NOACTIVATE);
+                        }
+                    }
+                    catch { }
+                });
             }
             m_isDraggingSnappedWindow = false;
             m_isDraggingTitleBar = false;
@@ -2358,11 +2394,9 @@ namespace FancyWM
             // 实时记录正常浮动窗口的尺寸与位置，防止窗口在各种方式贴靠后丢失记忆
             var curWa = m_display.WorkArea;
             var curPos = e.NewPosition;
-            if (curPos.Width > 150 && curPos.Height > 100 &&
-                curPos.Width < curWa.Width * 0.88 && curPos.Height < curWa.Height * 0.88 &&
+            if (IsValidFloatingRect(curPos, curWa) &&
                 !IsWindowSnapped(e.Source, curPos, curWa) &&
-                !m_isExternalDrag && m_currentInteraction == UserInteraction.None &&
-                m_potentialExternalDragWindow == null)
+                !m_isDraggingSnappedWindow)
             {
                 using (m_lastFloatingRectanglesLock.EnterScope())
                 {
@@ -2733,14 +2767,15 @@ namespace FancyWM
                 }
                 using (m_lastFloatingRectanglesLock.EnterScope())
                 {
-                    if (startPos.Width > 120 && startPos.Height > 100 &&
-                        startPos.Width < wa.Width * 0.88 && startPos.Height < wa.Height * 0.88 &&
-                        !IsWindowSnappedGeometry(startPos, wa))
+                    if (IsValidFloatingRect(startPos, wa))
                     {
                         m_lastFloatingRectangles[e.Source] = startPos;
                     }
                 }
-                RecordFloatingMemory(e.Source, startPos);
+                if (IsValidFloatingRect(startPos, wa))
+                {
+                    RecordFloatingMemory(e.Source, startPos);
+                }
                 m_currentDragTargetSize = new WinMan.Point(startPos.Width, startPos.Height);
             }
 
