@@ -296,8 +296,13 @@ namespace FancyWM
                 ToolTipText = "ScreenSplit (分屏管理器)",
                 Visibility = Visibility.Visible,
                 ContextMenu = m_contextMenu,
+                NoLeftClickDelay = true,
             };
             m_notifyIcon.TrayLeftMouseDown += OnNotifyIconLeftMouseDown;
+            m_notifyIcon.TrayLeftMouseUp += OnNotifyIconLeftMouseUp;
+            m_notifyIcon.TrayMouseDoubleClick += OnNotifyIconDoubleClick;
+            m_notifyIcon.LeftClickCommand = new DelegateCommand(_ => OpenSettings());
+            m_notifyIcon.DoubleClickCommand = new DelegateCommand(_ => OpenSettings());
             m_explorerHasVirtualDesktopTooltip = ExplorerFeature.HasVirtualDesktopTooltip();
 
             m_stopwatch = new Stopwatch();
@@ -991,43 +996,69 @@ namespace FancyWM
             };
         }
 
+        private static long s_lastOpenSettingsTick = 0;
+
         internal static void OpenSettings()
         {
+            long now = Environment.TickCount64;
+            if (now - s_lastOpenSettingsTick < 350)
+            {
+                return;
+            }
+            s_lastOpenSettingsTick = now;
+
             App.Current?.Logger?.Information("OpenSettings invoked: bringing UI to foreground");
             if (App.Current == null)
             {
                 return;
             }
 
+            if (!App.Current.Dispatcher.CheckAccess())
+            {
+                App.Current.Dispatcher.InvokeAsync(OpenSettings);
+                return;
+            }
+
+            // Close any lingering StartupWindow so SettingsWindow opens cleanly
             if (App.Current.Windows.OfType<StartupWindow>().FirstOrDefault() is StartupWindow startupWindow)
             {
-                if (startupWindow.WindowState == System.Windows.WindowState.Minimized)
+                try
                 {
-                    startupWindow.WindowState = System.Windows.WindowState.Normal;
+                    startupWindow.Close();
                 }
-                startupWindow.Activate();
-                var hwnd = new WindowInteropHelper(startupWindow).EnsureHandle();
+                catch
+                {
+                }
+            }
+
+            void BringToFront(Window win)
+            {
+                if (!win.IsVisible)
+                {
+                    win.Show();
+                }
+                if (win.WindowState == System.Windows.WindowState.Minimized)
+                {
+                    win.WindowState = System.Windows.WindowState.Normal;
+                }
+                win.Activate();
+                win.Focus();
+                win.Topmost = true;
+                win.Topmost = false;
+
+                var hwnd = new WindowInteropHelper(win).EnsureHandle();
+                _ = PInvoke.SetForegroundWindow(new(hwnd));
                 FocusHelper.ForceActivate(hwnd);
-                return;
             }
 
             if (App.Current.Windows.OfType<SettingsWindow>().FirstOrDefault() is SettingsWindow settingsWindow)
             {
-                if (settingsWindow.WindowState == System.Windows.WindowState.Minimized)
-                {
-                    settingsWindow.WindowState = System.Windows.WindowState.Normal;
-                }
-                settingsWindow.Activate();
-                var hwnd = new WindowInteropHelper(settingsWindow).EnsureHandle();
-                FocusHelper.ForceActivate(hwnd);
+                BringToFront(settingsWindow);
             }
             else
             {
                 var win = new SettingsWindow(new ViewModels.SettingsViewModel(App.Current.AppState.Settings));
-                win.Show();
-                win.Activate();
-                var hwnd = new WindowInteropHelper(win).EnsureHandle();
-                FocusHelper.ForceActivate(hwnd);
+                BringToFront(win);
             }
         }
 
@@ -1328,6 +1359,18 @@ namespace FancyWM
         }
 
         private void OnNotifyIconLeftMouseDown(object? sender, RoutedEventArgs e)
+        {
+            m_contextMenu.IsOpen = false;
+            OpenSettings();
+        }
+
+        private void OnNotifyIconLeftMouseUp(object? sender, RoutedEventArgs e)
+        {
+            m_contextMenu.IsOpen = false;
+            OpenSettings();
+        }
+
+        private void OnNotifyIconDoubleClick(object? sender, RoutedEventArgs e)
         {
             m_contextMenu.IsOpen = false;
             OpenSettings();

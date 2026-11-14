@@ -705,8 +705,8 @@ namespace FancyWM
             using (m_preSnapRectanglesLock.EnterScope())
             {
                 if (m_preSnapRectangles.TryGetValue(window, out var preRect) &&
-                    preRect.Width > 100 && preRect.Height > 80 &&
-                    (preRect.Width < wa.Width * 0.92 || preRect.Height < wa.Height * 0.92) &&
+                    preRect.Width > 120 && preRect.Height > 100 &&
+                    preRect.Width < wa.Width * 0.88 && preRect.Height < wa.Height * 0.88 &&
                     !IsWindowSnappedGeometry(preRect, wa))
                 {
                     return preRect;
@@ -717,8 +717,8 @@ namespace FancyWM
             using (m_preSnapRectanglesLock.EnterScope())
             {
                 if (m_activeDragOriginalRect.TryGetValue(window, out var origRect) &&
-                    origRect.Width > 100 && origRect.Height > 80 &&
-                    (origRect.Width < wa.Width * 0.92 || origRect.Height < wa.Height * 0.92) &&
+                    origRect.Width > 120 && origRect.Height > 100 &&
+                    origRect.Width < wa.Width * 0.88 && origRect.Height < wa.Height * 0.88 &&
                     !IsWindowSnappedGeometry(origRect, wa))
                 {
                     return origRect;
@@ -729,8 +729,8 @@ namespace FancyWM
             using (m_lastFloatingRectanglesLock.EnterScope())
             {
                 if (m_lastFloatingRectangles.TryGetValue(window, out var lastFloat) &&
-                    lastFloat.Width > 100 && lastFloat.Height > 80 &&
-                    (lastFloat.Width < wa.Width * 0.92 || lastFloat.Height < wa.Height * 0.92) &&
+                    lastFloat.Width > 120 && lastFloat.Height > 100 &&
+                    lastFloat.Width < wa.Width * 0.88 && lastFloat.Height < wa.Height * 0.88 &&
                     !IsWindowSnappedGeometry(lastFloat, wa))
                 {
                     return lastFloat;
@@ -740,8 +740,8 @@ namespace FancyWM
             // 4. Check Windows OS placement rcNormalPosition
             var wpRect = GetWindowRestoredRectangle(window);
             if (wpRect.HasValue &&
-                wpRect.Value.Width > 100 && wpRect.Value.Height > 80 &&
-                (wpRect.Value.Width < wa.Width * 0.92 || wpRect.Value.Height < wa.Height * 0.92) &&
+                wpRect.Value.Width > 120 && wpRect.Value.Height > 100 &&
+                wpRect.Value.Width < wa.Width * 0.88 && wpRect.Value.Height < wa.Height * 0.88 &&
                 !IsWindowSnappedGeometry(wpRect.Value, wa))
             {
                 return wpRect.Value;
@@ -1119,8 +1119,9 @@ namespace FancyWM
                 }
                 using (m_lastFloatingRectanglesLock.EnterScope())
                 {
-                    if (origRect.Width > 100 && origRect.Height > 80 &&
-                        (origRect.Width < wa.Width * 0.92 || origRect.Height < wa.Height * 0.92))
+                    if (origRect.Width > 120 && origRect.Height > 100 &&
+                        origRect.Width < wa.Width * 0.88 && origRect.Height < wa.Height * 0.88 &&
+                        !IsWindowSnappedGeometry(origRect, wa))
                     {
                         m_lastFloatingRectangles[window] = origRect;
                     }
@@ -1969,8 +1970,8 @@ namespace FancyWM
                     using (m_preSnapRectanglesLock.EnterScope())
                     {
                         if (m_activeDragOriginalRect.TryGetValue(window, out var origDragRect) &&
-                            origDragRect.Width > 100 && origDragRect.Height > 80 &&
-                            (origDragRect.Width < wa.Width * 0.92 || origDragRect.Height < wa.Height * 0.92) &&
+                            origDragRect.Width > 120 && origDragRect.Height > 100 &&
+                            origDragRect.Width < wa.Width * 0.88 && origDragRect.Height < wa.Height * 0.88 &&
                             !IsWindowSnappedGeometry(origDragRect, wa))
                         {
                             m_preSnapRectangles[window] = origDragRect;
@@ -2047,11 +2048,22 @@ namespace FancyWM
                 int targetW = preSnapRect.Width;
                 int targetH = preSnapRect.Height;
 
-                if (targetW >= wa.Width && targetH >= wa.Height)
+                if ((targetW >= wa.Width * 0.88 && targetH >= wa.Height * 0.88) ||
+                    targetH >= wa.Height * 0.95 ||
+                    IsWindowSnappedGeometry(preSnapRect, wa))
                 {
-                    bool isPortrait = preSnapRect.Width < preSnapRect.Height;
-                    targetW = isPortrait ? (int)(wa.Height * 0.45) : (int)(wa.Width * 0.60);
-                    targetH = isPortrait ? (int)(wa.Height * 0.75) : (int)(wa.Height * 0.65);
+                    var best = GetBestFloatingRectangle(window, wa, GetVisibleWindowRectangle(window));
+                    if (!IsWindowSnappedGeometry(best, wa) && best.Width < wa.Width * 0.88 && best.Height < wa.Height * 0.88)
+                    {
+                        targetW = best.Width;
+                        targetH = best.Height;
+                    }
+                    else
+                    {
+                        bool isPortrait = wa.Width < wa.Height;
+                        targetW = isPortrait ? (int)(wa.Height * 0.45) : (int)(wa.Width * 0.60);
+                        targetH = isPortrait ? (int)(wa.Height * 0.75) : (int)(wa.Height * 0.65);
+                    }
                 }
                 targetW = Math.Clamp(targetW, 100, (int)(wa.Width * 0.98));
                 targetH = Math.Clamp(targetH, 80, (int)(wa.Height * 0.98));
@@ -2257,9 +2269,10 @@ namespace FancyWM
             var curWa = m_display.WorkArea;
             var curPos = e.NewPosition;
             if (curPos.Width > 150 && curPos.Height > 100 &&
-                (curPos.Width < curWa.Width * 0.92 || curPos.Height < curWa.Height * 0.92) &&
+                curPos.Width < curWa.Width * 0.88 && curPos.Height < curWa.Height * 0.88 &&
                 !IsWindowSnapped(e.Source, curPos, curWa) &&
-                !m_isExternalDrag && m_currentInteraction == UserInteraction.None)
+                !m_isExternalDrag && m_currentInteraction == UserInteraction.None &&
+                m_potentialExternalDragWindow == null)
             {
                 using (m_lastFloatingRectanglesLock.EnterScope())
                 {
@@ -2638,8 +2651,9 @@ namespace FancyWM
                 }
                 using (m_lastFloatingRectanglesLock.EnterScope())
                 {
-                    if (startPos.Width > 100 && startPos.Height > 80 &&
-                        (startPos.Width < wa.Width * 0.92 || startPos.Height < wa.Height * 0.92))
+                    if (startPos.Width > 120 && startPos.Height > 100 &&
+                        startPos.Width < wa.Width * 0.88 && startPos.Height < wa.Height * 0.88 &&
+                        !IsWindowSnappedGeometry(startPos, wa))
                     {
                         m_lastFloatingRectangles[e.Source] = startPos;
                     }
