@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.InteropServices;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -63,6 +64,10 @@ namespace FancyWM
         private IDisplay? m_prevDisplay = null;
         private IDisplay? m_currentDisplay = null;
 
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
         private LowLevelHotkey[]? m_cmdHks;
         private LowLevelHotkey? m_capsLockHk;
 
@@ -80,6 +85,7 @@ namespace FancyWM
         private readonly Stopwatch m_stopwatch;
         private readonly IMicaProvider m_micaProvider;
         private readonly ModifierWindowMover m_mvm;
+        private readonly LowLevelMouseHook m_mouseHook;
         private long m_cmdSequenceId = 0;
         private bool m_showFocusDuringAction;
         private bool m_notifyVirtualDesktopServiceIncompatibility;
@@ -116,7 +122,9 @@ namespace FancyWM
             m_workspace.VirtualDesktopManager.DesktopRemoved += OnVirtualDesktopRemoved;
             m_workspace.FocusedWindowChanged += OnFocusedWindowChanged;
 
-            m_mvm = new ModifierWindowMover(m_workspace, App.Current.Services.GetRequiredService<LowLevelMouseHook>());
+            m_mouseHook = App.Current.Services.GetRequiredService<LowLevelMouseHook>();
+            m_mvm = new ModifierWindowMover(m_workspace, m_mouseHook);
+            m_mouseHook.ButtonStateChanged += OnGlobalMouseButtonStateChanged;
 
             var settings = App.Current.AppState.Settings
                 .Do(x => m_keybindings = x.Keybindings)
@@ -283,17 +291,33 @@ namespace FancyWM
                 }
             }
 
+            m_hideCountdownTimer = new CountdownTimer();
+            m_contextMenu = (ContextMenu)FindResource("NotifierContextMenu");
+
+            m_contextMenu.Opened += (s, e) =>
+            {
+                if (PresentationSource.FromVisual(m_contextMenu) is HwndSource hwndSource && hwndSource.Handle != IntPtr.Zero)
+                {
+                    PInvoke.SetForegroundWindow(new(hwndSource.Handle));
+                }
+            };
+            m_contextMenu.Closed += (s, e) =>
+            {
+                if (m_hwnd != IntPtr.Zero)
+                {
+                    _ = PostMessage(m_hwnd, 0x0000 /* WM_NULL */, IntPtr.Zero, IntPtr.Zero);
+                }
+            };
+
             m_notifyIcon = new TaskbarIcon
             {
                 Icon = appIcon ?? System.Drawing.SystemIcons.Application,
                 ToolTipText = "ScreenSplit (分屏管理器)",
                 Visibility = Visibility.Visible,
+                ContextMenu = m_contextMenu,
             };
             m_notifyIcon.TrayLeftMouseDown += OnNotifyIconLeftMouseDown;
             m_notifyIcon.TrayRightMouseDown += OnNotifyIconRightMouseDown;
-
-            m_hideCountdownTimer = new CountdownTimer();
-            m_contextMenu = (ContextMenu)FindResource("NotifierContextMenu");
             m_explorerHasVirtualDesktopTooltip = ExplorerFeature.HasVirtualDesktopTooltip();
 
             m_stopwatch = new Stopwatch();
@@ -356,13 +380,13 @@ namespace FancyWM
 
         private void OnFocusedWindowChanged(object? sender, FocusedWindowChangedEventArgs e)
         {
+            Dispatcher.InvokeAsync(() =>
+            {
+                m_contextMenu.IsOpen = false;
+            });
+
             if (e.NewFocusedWindow != null)
             {
-                Dispatcher.InvokeAsync(() =>
-                {
-                    m_contextMenu.IsOpen = false;
-                });
-
                 var currentDisplay = m_workspace.DisplayManager.Displays.FirstOrDefault(x => x.Bounds.Contains(e.NewFocusedWindow.Position.Center));
                 if (currentDisplay != null)
                 {
@@ -1336,7 +1360,44 @@ namespace FancyWM
 
         private void OnNotifyIconRightMouseDown(object? sender, RoutedEventArgs e)
         {
+            if (m_hwnd != IntPtr.Zero)
+            {
+                PInvoke.SetForegroundWindow(new(m_hwnd));
+            }
             m_contextMenu.IsOpen = true;
+        }
+
+        private void OnGlobalMouseButtonStateChanged(object? sender, ref LowLevelMouseHook.ButtonStateChangedEventArgs e)
+        {
+            if (e.IsPressed && m_contextMenu.IsOpen)
+            {
+                int clickX = e.X;
+                int clickY = e.Y;
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (!m_contextMenu.IsOpen)
+                        return;
+
+                    if (PresentationSource.FromVisual(m_contextMenu) is HwndSource source && source.Handle != IntPtr.Zero)
+                    {
+                        if (PInvoke.GetWindowRect(new(source.Handle), out RECT rect))
+                        {
+                            if (clickX < rect.left || clickX > rect.right || clickY < rect.top || clickY > rect.bottom)
+                            {
+                                m_contextMenu.IsOpen = false;
+                            }
+                        }
+                        else
+                        {
+                            m_contextMenu.IsOpen = false;
+                        }
+                    }
+                    else
+                    {
+                        m_contextMenu.IsOpen = false;
+                    }
+                }), DispatcherPriority.Normal);
+            }
         }
 
         private async void OnVirtualDesktopChanged(object? sender, CurrentDesktopChangedEventArgs e)
@@ -1679,6 +1740,10 @@ namespace FancyWM
             m_logger.Debug($"Closing all other subscriptions...");
             m_subscriptions?.Dispose();
 
+            if (m_mouseHook != null)
+            {
+                m_mouseHook.ButtonStateChanged -= OnGlobalMouseButtonStateChanged;
+            }
             m_notifyIcon?.Dispose();
         }
     }

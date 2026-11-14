@@ -131,7 +131,7 @@
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <TextBlock Text="ScreenSplit" FontWeight="SemiBold" FontSize="18" Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}" />
                                 <Border Background="#10007AFF" BorderBrush="#30007AFF" BorderThickness="1" CornerRadius="6" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center">
-                                    <TextBlock Text="v1.0.4 正式版" FontSize="11" FontWeight="Medium" Foreground="#007AFF" />
+                                    <TextBlock Text="v1.0.5 正式版" FontSize="11" FontWeight="Medium" Foreground="#007AFF" />
                                 </Border>
                             </StackPanel>
                             <TextBlock Text="软件已就绪并常驻右下角系统托盘 · 纯鼠标直觉交互 · 纯绿色便携"
