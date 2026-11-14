@@ -110,7 +110,8 @@ namespace FancyWM
             if (!Active)
                 return;
 
-            if (m_currentInteraction != UserInteraction.None && m_sw.Elapsed - m_lastUpdateLayout <= TimeSpan.FromSeconds(1.0 / m_display.RefreshRate))
+            double refreshRate = m_display.RefreshRate > 0 ? m_display.RefreshRate : 60.0;
+            if (m_currentInteraction != UserInteraction.None && m_sw.Elapsed - m_lastUpdateLayout <= TimeSpan.FromSeconds(1.0 / (refreshRate * 2.0)))
             {
                 return;
             }
@@ -241,7 +242,10 @@ namespace FancyWM
                 }
                 await transitionGroup.PerformSmoothTransitionAsync(TimeSpan.FromMilliseconds(100));
 
-                m_gui.FocusRectangle = focusRectangle;
+                if (m_showFocus)
+                {
+                    UpdateFocusRectangleDirect();
+                }
             }
             else
             {
@@ -315,7 +319,7 @@ namespace FancyWM
 
         private bool CanShowFocusRectangle()
         {
-            return m_showFocus && m_currentInteraction == UserInteraction.None && m_movingPanelNode == null && m_movingWindow == null;
+            return m_showFocus && m_movingPanelNode == null;
         }
 
         private void InvalidateFocusRectangle(bool immediate = false)
@@ -442,6 +446,20 @@ namespace FancyWM
 
             if (focusedNode is WindowNode focusedWindow)
             {
+                if (m_movingWindow != null && Equals(m_movingWindow, focusedWindow.WindowReference))
+                {
+                    var moveRect = GetVisibleWindowRectangle(focusedWindow.WindowReference);
+                    if (moveRect.Width <= 0 || moveRect.Height <= 0)
+                    {
+                        moveRect = focusedWindow.WindowReference.Position;
+                    }
+                    if (moveRect.Width > 0 && moveRect.Height > 0 && m_display.Bounds.Contains(moveRect.Center))
+                    {
+                        return moveRect;
+                    }
+                    return null;
+                }
+
                 return focusedWindow.ComputedRectangle;
             }
 
@@ -1895,7 +1913,8 @@ namespace FancyWM
                 return;
             }
 
-            if (m_currentInteraction != UserInteraction.None && m_sw.Elapsed - m_lastWindowPositionChanged <= TimeSpan.FromSeconds(1.0 / m_display.RefreshRate))
+            double refreshRate = m_display.RefreshRate > 0 ? m_display.RefreshRate : 60.0;
+            if (m_currentInteraction != UserInteraction.None && m_sw.Elapsed - m_lastWindowPositionChanged <= TimeSpan.FromSeconds(1.0 / (refreshRate * 2.0)))
             {
                 return;
             }
@@ -1910,7 +1929,7 @@ namespace FancyWM
                     m_dispatcher.InvokeAsync(() =>
                     {
                         DetectChanges(e.Source);
-                        if (m_showFocus && m_movingWindow == null && m_currentInteraction == UserInteraction.None && Equals(m_workspace.FocusedWindow, e.Source))
+                        if (m_showFocus && Equals(m_workspace.FocusedWindow, e.Source))
                         {
                             UpdateFocusRectangleDirect();
                         }
@@ -1928,10 +1947,6 @@ namespace FancyWM
                 if (!m_isDraggingSnappedWindow && !m_isDraggingTitleBar && !isSizePreserved)
                 {
                     m_currentInteraction = UserInteraction.Resizing;
-                    if (m_showFocus)
-                    {
-                        m_gui.FocusRectangle = null;
-                    }
                     StopDragTrackingTimer();
                     m_lastPreviewCursor = new Point(-99999, -99999);
                     SetPreviewRectangle(null, null);
@@ -1948,6 +1963,45 @@ namespace FancyWM
                 else
                 {
                     m_currentInteraction = UserInteraction.Moving;
+                }
+            }
+
+            if (m_showFocus && (Equals(m_workspace.FocusedWindow, e.Source) || Equals(m_movingWindow, e.Source)))
+            {
+                var visibleRect = GetVisibleWindowRectangle(e.Source);
+                if (visibleRect.Width <= 0 || visibleRect.Height <= 0)
+                {
+                    var frame = e.Source.FrameMargins;
+                    visibleRect = new Rectangle(
+                        e.NewPosition.Left + frame.Left,
+                        e.NewPosition.Top + frame.Top,
+                        e.NewPosition.Right - frame.Right,
+                        e.NewPosition.Bottom - frame.Bottom);
+                    if (visibleRect.Width <= 0 || visibleRect.Height <= 0)
+                    {
+                        visibleRect = e.NewPosition;
+                    }
+                }
+
+                if (visibleRect.Width > 0 && visibleRect.Height > 0)
+                {
+                    if (m_display.Bounds.Contains(visibleRect.Center))
+                    {
+                        m_dispatcher.InvokeAsync(() =>
+                        {
+                            if (m_showFocus && (Equals(m_workspace.FocusedWindow, e.Source) || Equals(m_movingWindow, e.Source)))
+                            {
+                                m_gui.FocusRectangle = visibleRect;
+                            }
+                        }, System.Windows.Threading.DispatcherPriority.Render);
+                    }
+                    else
+                    {
+                        m_dispatcher.InvokeAsync(() =>
+                        {
+                            m_gui.FocusRectangle = null;
+                        }, System.Windows.Threading.DispatcherPriority.Render);
+                    }
                 }
             }
 
@@ -2222,17 +2276,21 @@ namespace FancyWM
             }
             m_movingWindow = e.Source;
             m_currentInteraction = UserInteraction.Starting;
-            if (m_showFocus)
-            {
-                m_focusSettleCts?.Cancel();
-                m_gui.FocusRectangle = null;
-            }
 
             var cursor = m_workspace.CursorLocation;
             Rectangle startPos = GetVisibleWindowRectangle(e.Source);
             if (startPos.Width <= 0 || startPos.Height <= 0)
             {
                 startPos = e.OldPosition.Width > 0 ? e.OldPosition : e.Source.Position;
+            }
+
+            if (m_showFocus)
+            {
+                m_focusSettleCts?.Cancel();
+                if (Equals(m_workspace.FocusedWindow, e.Source) && m_display.Bounds.Contains(startPos.Center))
+                {
+                    m_gui.FocusRectangle = startPos;
+                }
             }
 
             m_logger.Information("[Drag] PositionChangeStart on {Window}, Pos={Pos}, Cursor={Cursor}", e.Source.DebugString(), startPos, cursor);
