@@ -686,57 +686,43 @@ namespace FancyWM
 
         private ScreenSnapZone GetSnapZone(Point pt, Rectangle wa)
         {
-            int edgeMargin = 25;
-            int cornerSizeX = Math.Max(120, (int)(wa.Width * 0.20));
-            int cornerSizeY = Math.Max(100, (int)(wa.Height * 0.20));
+            double scale = m_display.Scaling > 0 ? m_display.Scaling : 1.0;
+            int edgeMargin = Math.Max(20, (int)(25 * scale));
+            // Corner hotzone (1/4 layout): Requires cursor to be dragged close to the actual corner (~48 DIP)
+            int cornerSize = Math.Max(35, (int)(48 * scale));
 
-            bool isNearLeft = pt.X <= wa.Left + edgeMargin;
-            bool isNearRight = pt.X >= wa.Right - edgeMargin;
-            bool isNearTop = pt.Y <= wa.Top + edgeMargin;
-            bool isNearBottom = pt.Y >= wa.Bottom - edgeMargin;
-
-            // 1. Top-Left Corner (1/4)
-            if ((isNearLeft && pt.Y <= wa.Top + cornerSizeY) ||
-                (isNearTop && pt.X <= wa.Left + cornerSizeX))
+            // 1. Four Corners (1/4 Layout) - Must be within corner threshold in both X and Y
+            if (pt.X <= wa.Left + cornerSize && pt.Y <= wa.Top + cornerSize)
             {
                 return ScreenSnapZone.TopLeftQuarter;
             }
-
-            // 2. Top-Right Corner (1/4)
-            if ((isNearRight && pt.Y <= wa.Top + cornerSizeY) ||
-                (isNearTop && pt.X >= wa.Right - cornerSizeX))
+            if (pt.X >= wa.Right - cornerSize && pt.Y <= wa.Top + cornerSize)
             {
                 return ScreenSnapZone.TopRightQuarter;
             }
-
-            // 3. Bottom-Left Corner (1/4)
-            if ((isNearLeft && pt.Y >= wa.Bottom - cornerSizeY) ||
-                (isNearBottom && pt.X <= wa.Left + cornerSizeX))
+            if (pt.X <= wa.Left + cornerSize && pt.Y >= wa.Bottom - cornerSize)
             {
                 return ScreenSnapZone.BottomLeftQuarter;
             }
-
-            // 4. Bottom-Right Corner (1/4)
-            if ((isNearRight && pt.Y >= wa.Bottom - cornerSizeY) ||
-                (isNearBottom && pt.X >= wa.Right - cornerSizeX))
+            if (pt.X >= wa.Right - cornerSize && pt.Y >= wa.Bottom - cornerSize)
             {
                 return ScreenSnapZone.BottomRightQuarter;
             }
 
-            // 5. Four Edges (1/2)
-            if (isNearLeft)
+            // 2. Four Edges (1/2 Layout) - Triggered when near screen edge but outside corner hotzone
+            if (pt.X <= wa.Left + edgeMargin)
             {
                 return ScreenSnapZone.LeftHalf;
             }
-            if (isNearRight)
+            if (pt.X >= wa.Right - edgeMargin)
             {
                 return ScreenSnapZone.RightHalf;
             }
-            if (isNearTop)
+            if (pt.Y <= wa.Top + edgeMargin)
             {
                 return ScreenSnapZone.TopHalf;
             }
-            if (isNearBottom)
+            if (pt.Y >= wa.Bottom - edgeMargin)
             {
                 return ScreenSnapZone.BottomHalf;
             }
