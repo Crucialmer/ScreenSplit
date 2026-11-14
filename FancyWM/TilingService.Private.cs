@@ -896,6 +896,13 @@ namespace FancyWM
                 return;
             }
 
+            // 外部拖动时，实时检测鼠标左键是否已经松开
+            if (m_isExternalDrag && (PInvoke.GetAsyncKeyState(1) & 0x8000) == 0)
+            {
+                EndExternalDrag();
+                return;
+            }
+
             if (pt == m_lastPreviewCursor)
             {
                 return;
@@ -909,7 +916,9 @@ namespace FancyWM
         {
             if (m_isExternalDrag && m_movingWindow != null)
             {
-                if (e.Button == LowLevelMouseHook.MouseButton.Left || e.Button == LowLevelMouseHook.MouseButton.Right)
+                // 用户松开左键时（或者右键取消时）触发放下与贴靠
+                if ((e.Button == LowLevelMouseHook.MouseButton.Left && !e.IsPressed) ||
+                    (e.Button == LowLevelMouseHook.MouseButton.Right && e.IsPressed))
                 {
                     _ = m_dispatcher.InvokeAsync(EndExternalDrag);
                 }
@@ -2055,7 +2064,9 @@ namespace FancyWM
                 if (!m_ignoreRepositionSet.Contains(e.Source))
                 {
                     // Check if this could be an external drag (e.g. Quicker / SetWindowPos mover)
-                    if (m_currentInteraction == UserInteraction.None && m_movingWindow == null)
+                    // 仅当用户正在物理按住鼠标左键的状态下，才进行外部拖动检测与触发
+                    bool isLeftButtonDown = (PInvoke.GetAsyncKeyState(1) & 0x8000) != 0;
+                    if (m_currentInteraction == UserInteraction.None && m_movingWindow == null && isLeftButtonDown)
                     {
                         var cursor = m_workspace.CursorLocation;
                         bool isSizePreservedExternal = Math.Abs(e.OldPosition.Width - e.NewPosition.Width) <= 10 &&
@@ -2091,6 +2102,11 @@ namespace FancyWM
                                 m_lastExternalDragTime = m_sw.Elapsed;
                             }
                         }
+                    }
+                    else if (!isLeftButtonDown)
+                    {
+                        m_potentialExternalDragWindow = null;
+                        m_externalDragFrameCount = 0;
                     }
 
                     // Some other event might have resulted in the movement of the window.
