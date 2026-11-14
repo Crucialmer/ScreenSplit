@@ -178,6 +178,7 @@ namespace FancyWM
         private readonly HashSet<IWindow> m_snappedWindows = [];
         private readonly Utilities.DebugLock m_snappedWindowsLock = new(LockThreshold);
         private double m_dragGrabRatioX = 0.5;
+        private double m_dragGrabRatioY = 0.1;
         private IWindow? m_movingWindow;
         private bool m_isDraggingTitleBar = false;
         private bool m_isDraggingSnappedWindow = false;

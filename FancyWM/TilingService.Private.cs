@@ -829,7 +829,7 @@ namespace FancyWM
                                 targetH = Math.Clamp(targetH, 80, (int)(wa.Height * 0.98));
 
                                 int targetX = pt.X - (int)(targetW * m_dragGrabRatioX);
-                                int targetY = pt.Y - 20;
+                                int targetY = pt.Y - (int)(targetH * m_dragGrabRatioY);
 
                                 if (targetX < wa.Left) targetX = wa.Left;
                                 if (targetX + targetW > wa.Right) targetX = wa.Right - targetW;
@@ -1791,7 +1791,7 @@ namespace FancyWM
                 targetH = Math.Clamp(targetH, 80, (int)(wa.Height * 0.98));
 
                 int targetX = pt.X - (int)(targetW * m_dragGrabRatioX);
-                int targetY = pt.Y - 20;
+                int targetY = pt.Y - (int)(targetH * m_dragGrabRatioY);
 
                 if (targetX < wa.Left) targetX = wa.Left;
                 if (targetX + targetW > wa.Right) targetX = wa.Right - targetW;
@@ -2241,6 +2241,15 @@ namespace FancyWM
             else
             {
                 m_dragGrabRatioX = 0.5;
+            }
+
+            if (startPos.Height > 0)
+            {
+                m_dragGrabRatioY = Math.Clamp((cursor.Y - startPos.Top) / (double)startPos.Height, 0.05, 0.95);
+            }
+            else
+            {
+                m_dragGrabRatioY = 0.1;
             }
 
             var wa = m_display.WorkArea;
