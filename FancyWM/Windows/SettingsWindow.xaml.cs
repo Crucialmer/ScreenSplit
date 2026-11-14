@@ -3,6 +3,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 
@@ -29,6 +30,13 @@ namespace FancyWM.Windows
 
             InitializeComponent();
             m_logger.Debug($"Initialised {nameof(SettingsWindow)} successfully");
+
+            Loaded += (s, e) =>
+            {
+                Activate();
+                var hwnd = new WindowInteropHelper(this).EnsureHandle();
+                FocusHelper.ForceActivate(hwnd);
+            };
         }
 
         protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)

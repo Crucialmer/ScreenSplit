@@ -55,6 +55,31 @@ namespace FancyWM
         [STAThread]
         public static int Main(string[] args)
         {
+            AppDomain.CurrentDomain.AssemblyResolve += (s, e) =>
+            {
+                try
+                {
+                    var requestedName = new AssemblyName(e.Name);
+                    if (requestedName.Name == "ScreenSplit" || requestedName.Name == "FancyWM")
+                    {
+                        return typeof(Startup).Assembly;
+                    }
+                    foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                    {
+                        if (string.Equals(asm.GetName().Name, requestedName.Name, StringComparison.OrdinalIgnoreCase))
+                        {
+                            return asm;
+                        }
+                    }
+                }
+                catch
+                {
+                }
+                return null;
+            };
+
+            App.IsAutostartLaunch = args.Contains("--autostart") || args.Contains("--startup") || args.Contains("--silent") || args.Contains("--minimized");
+
             if (args.Length == 0)
             {
                 PInvoke.FreeConsole();
@@ -150,17 +175,69 @@ Type 'ScreenSplit --help' from anywhere after installation.
                 // Another instance is already running! Gently wake up the existing instance and exit cleanly
                 try
                 {
-                    var hwnd = PInvoke.FindWindow(null, "ScreenSplitMainWindow").Value;
-                    if (hwnd != IntPtr.Zero)
-                    {
-                        WindowCopyDataHelper.Send(hwnd, Encoding.Default.GetBytes("OpenSettings"));
-                    }
+                    SingleInstanceIpc.SendCommand("OpenSettings");
+                    SingleInstanceIpc.SignalWakeupEvent();
                 }
                 catch
                 {
                 }
                 return 0;
             }
+
+            // Start IPC server and Wakeup Listener for single instance
+            SingleInstanceIpc.StartServer(command =>
+            {
+                void handleCommand()
+                {
+                    if (App.Current == null)
+                    {
+                        return;
+                    }
+
+                    App.Current.Dispatcher.InvokeAsync(async () =>
+                    {
+                        if (App.Current.MainWindow is MainWindow mainWindow)
+                        {
+                            await mainWindow.ExecuteActionFromStringAsync(command);
+                        }
+                        else
+                        {
+                            MainWindow.OpenSettings();
+                        }
+                    });
+                }
+
+                if (App.Current == null)
+                {
+                    ThreadPool.QueueUserWorkItem(_ =>
+                    {
+                        for (int i = 0; i < 30; i++)
+                        {
+                            Thread.Sleep(100);
+                            if (App.Current != null)
+                            {
+                                handleCommand();
+                                break;
+                            }
+                        }
+                    });
+                }
+                else
+                {
+                    handleCommand();
+                }
+            });
+
+            SingleInstanceIpc.StartWakeupListener(() =>
+            {
+                if (App.Current != null)
+                {
+                    App.Current.Dispatcher.InvokeAsync(() =>
+                    {
+                        MainWindow.OpenSettings();
+                    });
+                }
+            });
 
             // Parse command line
             var logLevel = args.Contains("-vv")
@@ -186,6 +263,7 @@ Type 'ScreenSplit --help' from anywhere after installation.
             });
 
             ProgramExit += OnProgramExit;
+            ProgramExit += SingleInstanceIpc.StopServer;
             ProgramExit += SystemSnapManager.RestoreSystemSnap;
             CrashCleanup += SystemSnapManager.RestoreSystemSnap;
             SystemSnapManager.Initialize();
@@ -195,6 +273,15 @@ Type 'ScreenSplit --help' from anywhere after installation.
             // Create logger
             var logger = provider.GetRequiredService<ILogger>();
             logger.Information($"ScreenSplit v{GetVersionString()} on {Environment.OSVersion}");
+
+            AppDomain.CurrentDomain.FirstChanceException += (s, e) =>
+            {
+                // Ignore benign exceptions if any, or log all to diagnose
+                if (e.Exception is not OperationCanceledException)
+                {
+                    logger.Warning("FirstChanceException: {Type} - {Message}", e.Exception.GetType().Name, e.Exception.Message);
+                }
+            };
 
             ConfigureThreadPriority(logger);
 
@@ -327,7 +414,8 @@ Type 'ScreenSplit --help' from anywhere after installation.
                 logFileName,
                 restrictedToMinimumLevel: args.LogLevel,
                 fileSizeLimitBytes: 4 * 1024 * 1024,
-                buffered: false);
+                buffered: false,
+                flushToDiskInterval: TimeSpan.FromMilliseconds(200));
 
             var logBuffer = new CircularBuffer<string>(1000);
             var lineWriter = new LineWriter(logBuffer, '\n');
@@ -381,12 +469,22 @@ Type 'ScreenSplit --help' from anywhere after installation.
 
         private static void SendMessage(string message)
         {
-            var hwnd = PInvoke.FindWindow(null, "ScreenSplitMainWindow").Value;
-            if (hwnd == IntPtr.Zero)
+            if (!SingleInstanceIpc.SendCommand(message))
             {
+                try
+                {
+                    var hwnd = PInvoke.FindWindow(null, "ScreenSplitMainWindow").Value;
+                    if (hwnd != IntPtr.Zero)
+                    {
+                        WindowCopyDataHelper.Send(hwnd, Encoding.Default.GetBytes(message));
+                        return;
+                    }
+                }
+                catch
+                {
+                }
                 throw new InvalidOperationException("ScreenSplit is not running!");
             }
-            WindowCopyDataHelper.Send(hwnd, Encoding.Default.GetBytes(message));
         }
 
         private static string GenerateActionsHelp()

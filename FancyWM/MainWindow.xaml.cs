@@ -90,10 +90,12 @@ namespace FancyWM
         public MainWindow()
 #pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
         {
-            InitializeComponent();
-            ThemeEngineManager.Initialize(Path.GetFullPath("themes"), "custom.css");
-
             m_logger = App.Current.Logger;
+            m_logger.Information("MainWindow constructor started");
+            InitializeComponent();
+            m_logger.Information("MainWindow InitializeComponent finished");
+            ThemeEngineManager.Initialize(Path.GetFullPath("themes"), "custom.css");
+            m_logger.Information("MainWindow ThemeEngineManager finished");
 
             m_unmanagedResourceGuard = ApplySystemParameters();
 
@@ -148,22 +150,53 @@ namespace FancyWM
                 .Take(1)
                 .Do(x =>
                 {
-                    bool shouldShow = !x.HasShownFirstRunPrompt || x.ShowStartupWindow;
-                    if (shouldShow)
+                    m_logger.Information("StartupSettings check: isAutostart={IsAutostart}, HasShownFirstRunPrompt={FirstRun}, ShowStartupWindow={ShowStartup}", App.IsAutostartLaunch, x.HasShownFirstRunPrompt, x.ShowStartupWindow);
+                    if (App.IsAutostartLaunch)
                     {
-                        Dispatcher.Invoke(() =>
+                        if (x.ShowStartupWindow)
                         {
-                            new StartupWindow(new ViewModels.SettingsViewModel(App.Current.AppState.Settings)).Show();
-
-                            if (!x.HasShownFirstRunPrompt)
+                            Dispatcher.BeginInvoke(() =>
                             {
-                                _ = App.Current.AppState.Settings.SaveAsync(s => s with
+                                m_logger.Information("Showing StartupWindow (Autostart requested)");
+                                var win = new StartupWindow(new ViewModels.SettingsViewModel(App.Current.AppState.Settings));
+                                win.Show();
+                                win.Activate();
+                                var hwnd = new WindowInteropHelper(win).EnsureHandle();
+                                FocusHelper.ForceActivate(hwnd);
+                            });
+                        }
+                    }
+                    else
+                    {
+                        if (!x.HasShownFirstRunPrompt || x.ShowStartupWindow)
+                        {
+                            Dispatcher.BeginInvoke(() =>
+                            {
+                                m_logger.Information("Showing StartupWindow (Initial run or requested)");
+                                var win = new StartupWindow(new ViewModels.SettingsViewModel(App.Current.AppState.Settings));
+                                win.Show();
+                                win.Activate();
+                                var hwnd = new WindowInteropHelper(win).EnsureHandle();
+                                FocusHelper.ForceActivate(hwnd);
+
+                                if (!x.HasShownFirstRunPrompt)
                                 {
-                                    HasShownFirstRunPrompt = true,
-                                    ShowStartupWindow = false
-                                });
-                            }
-                        }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                                    _ = App.Current.AppState.Settings.SaveAsync(s => s with
+                                    {
+                                        HasShownFirstRunPrompt = true,
+                                        ShowStartupWindow = false
+                                    });
+                                }
+                            });
+                        }
+                        else
+                        {
+                            Dispatcher.BeginInvoke(() =>
+                            {
+                                m_logger.Information("Showing SettingsWindow (Manual launch)");
+                                OpenSettings();
+                            });
+                        }
                     }
                 });
 
@@ -284,6 +317,7 @@ namespace FancyWM
             }
 
             Loaded += OnLoaded;
+            m_logger.Information("MainWindow constructor completed, showing and hiding");
             Show();
             Hide();
             ((HwndSource)PresentationSource.FromVisual(this)).AddHook(WndProc);
@@ -636,7 +670,7 @@ namespace FancyWM
             await ShowToastAsync(messageText, hintText, ToastDurationLong);
         }
 
-        private async Task ExecuteActionFromStringAsync(string actionName)
+        internal async Task ExecuteActionFromStringAsync(string actionName)
         {
             if (string.Equals(actionName, "OpenSettings", StringComparison.OrdinalIgnoreCase))
             {
@@ -648,6 +682,13 @@ namespace FancyWM
                 string.Equals(actionName, "OpenUpdates", StringComparison.OrdinalIgnoreCase))
             {
                 UpdateWindow.ShowUpdateDialog();
+                return;
+            }
+
+            if (string.Equals(actionName, "Exit", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(actionName, "Quit", StringComparison.OrdinalIgnoreCase))
+            {
+                App.Current.Terminate();
                 return;
             }
 
@@ -953,6 +994,12 @@ namespace FancyWM
 
         internal static void OpenSettings()
         {
+            App.Current?.Logger?.Information("OpenSettings invoked: bringing UI to foreground");
+            if (App.Current == null)
+            {
+                return;
+            }
+
             if (App.Current.Windows.OfType<StartupWindow>().FirstOrDefault() is StartupWindow startupWindow)
             {
                 if (startupWindow.WindowState == System.Windows.WindowState.Minimized)
@@ -960,6 +1007,8 @@ namespace FancyWM
                     startupWindow.WindowState = System.Windows.WindowState.Normal;
                 }
                 startupWindow.Activate();
+                var hwnd = new WindowInteropHelper(startupWindow).EnsureHandle();
+                FocusHelper.ForceActivate(hwnd);
                 return;
             }
 
@@ -970,10 +1019,16 @@ namespace FancyWM
                     settingsWindow.WindowState = System.Windows.WindowState.Normal;
                 }
                 settingsWindow.Activate();
+                var hwnd = new WindowInteropHelper(settingsWindow).EnsureHandle();
+                FocusHelper.ForceActivate(hwnd);
             }
             else
             {
-                new SettingsWindow(new ViewModels.SettingsViewModel(App.Current.AppState.Settings)).Show();
+                var win = new SettingsWindow(new ViewModels.SettingsViewModel(App.Current.AppState.Settings));
+                win.Show();
+                win.Activate();
+                var hwnd = new WindowInteropHelper(win).EnsureHandle();
+                FocusHelper.ForceActivate(hwnd);
             }
         }
 

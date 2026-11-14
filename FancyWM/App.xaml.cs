@@ -86,6 +86,8 @@ namespace FancyWM
 
         public bool RestartOnClose { get; internal set; }
 
+        public static bool IsAutostartLaunch { get; set; } = false;
+
         private App()
         {
             throw new NotImplementedException();

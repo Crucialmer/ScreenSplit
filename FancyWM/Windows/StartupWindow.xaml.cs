@@ -1,6 +1,8 @@
 ﻿using System.Windows;
 using System.Windows.Input;
+using System.Windows.Interop;
 
+using FancyWM.Utilities;
 using FancyWM.ViewModels;
 
 namespace FancyWM.Windows
@@ -17,6 +19,12 @@ namespace FancyWM.Windows
             InitializeComponent();
             m_settingsViewModel = settingsViewModel;
             DataContext = m_settingsViewModel;
+            Loaded += (s, e) =>
+            {
+                Activate();
+                var hwnd = new WindowInteropHelper(this).EnsureHandle();
+                FocusHelper.ForceActivate(hwnd);
+            };
         }
 
         private void OnWindowMouseDown(object sender, MouseButtonEventArgs e)
