@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 using FancyWM.Utilities;
@@ -164,7 +165,10 @@ namespace FancyWM
                 }
             }
 
-            m_gui.FocusRectangle = GetFocusRectangle(focusedNode);
+            if (m_focusSettleCts == null)
+            {
+                m_gui.FocusRectangle = GetFocusRectangle(focusedNode);
+            }
 
             var repositionTask = RepositionAsync();
 
@@ -314,11 +318,93 @@ namespace FancyWM
             return m_showFocus && m_currentInteraction == UserInteraction.None && m_movingPanelNode == null && m_movingWindow == null;
         }
 
-        private void UpdateFocusRectangle()
+        private void InvalidateFocusRectangle(bool immediate = false)
         {
             if (!m_dispatcher.CheckAccess())
             {
-                m_dispatcher.InvokeAsync(UpdateFocusRectangle, System.Windows.Threading.DispatcherPriority.DataBind);
+                m_dispatcher.InvokeAsync(() => InvalidateFocusRectangle(immediate), System.Windows.Threading.DispatcherPriority.Send);
+                return;
+            }
+
+            m_focusSettleCts?.Cancel();
+            m_focusSettleCts?.Dispose();
+            m_focusSettleCts = null;
+
+            if (!m_active || !CanShowFocusRectangle())
+            {
+                m_gui.FocusRectangle = null;
+                m_currentFocusedTarget = null;
+                return;
+            }
+
+            var focused = m_workspace.FocusedWindow;
+            if (focused == null || !focused.IsAlive)
+            {
+                m_gui.FocusRectangle = null;
+                m_currentFocusedTarget = null;
+                return;
+            }
+
+            if (immediate)
+            {
+                m_currentFocusedTarget = focused;
+                UpdateFocusRectangleDirect();
+                return;
+            }
+
+            // 0ms Clear: When focus changes, immediately hide the highlight rectangle.
+            // This resets IsFocusRectangleVisible = false with zero latency, wiping any DropShadow
+            // shader cache pixels from the old window and preventing cross-window cut-through / ghosts.
+            m_gui.FocusRectangle = null;
+            m_currentFocusedTarget = focused;
+
+            // DWM Settle Delay (~50ms / 2-3 frames):
+            // Wait for Windows DWM to elevate the background window in Z-order and complete
+            // its physical composition / redraw before we snap and fade in the focus glow.
+            var cts = new CancellationTokenSource();
+            m_focusSettleCts = cts;
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(50, cts.Token);
+                    if (cts.Token.IsCancellationRequested)
+                        return;
+
+                    await m_dispatcher.InvokeAsync(() =>
+                    {
+                        if (cts.Token.IsCancellationRequested)
+                            return;
+
+                        m_focusSettleCts?.Dispose();
+                        m_focusSettleCts = null;
+
+                        if (!m_active || !CanShowFocusRectangle())
+                            return;
+
+                        if (Equals(m_workspace.FocusedWindow, focused))
+                        {
+                            UpdateFocusRectangleDirect();
+                        }
+                    }, System.Windows.Threading.DispatcherPriority.Render);
+                }
+                catch (OperationCanceledException)
+                {
+                }
+            });
+        }
+
+        private void UpdateFocusRectangle()
+        {
+            InvalidateFocusRectangle(immediate: false);
+        }
+
+        private void UpdateFocusRectangleDirect()
+        {
+            if (!m_dispatcher.CheckAccess())
+            {
+                m_dispatcher.InvokeAsync(UpdateFocusRectangleDirect, System.Windows.Threading.DispatcherPriority.Render);
                 return;
             }
 
@@ -1371,13 +1457,10 @@ namespace FancyWM
             if (!m_active)
                 return;
 
-            m_dispatcher.InvokeAsync(() =>
+            if (m_showFocus)
             {
-                if (m_showFocus)
-                {
-                    UpdateFocusRectangle();
-                }
-            }, System.Windows.Threading.DispatcherPriority.DataBind);
+                InvalidateFocusRectangle(immediate: false);
+            }
         }
 
         private void OnWindowGotFocus(object? sender, WindowFocusChangedEventArgs e)
@@ -1397,13 +1480,17 @@ namespace FancyWM
                             // to be send to the back
                             hideMaximised = true;
                             m_backend.SetFocus(e.Source);
+                            if (m_showFocus)
+                            {
+                                InvalidateFocusRectangle(immediate: false);
+                            }
                         }
                         else
                         {
                             m_logger.Debug("Window {Window} is not managed by backend", e.Source.DebugString());
                             if (m_showFocus)
                             {
-                                UpdateFocusRectangle();
+                                InvalidateFocusRectangle(immediate: false);
                             }
                             return;
                         }
@@ -1450,7 +1537,7 @@ namespace FancyWM
             m_currentInteraction = UserInteraction.None;
             if (m_showFocus)
             {
-                m_dispatcher.BeginInvoke(UpdateFocusRectangle);
+                InvalidateFocusRectangle(immediate: false);
             }
         }
 
@@ -1788,7 +1875,7 @@ namespace FancyWM
 
             if (m_showFocus)
             {
-                UpdateFocusRectangle();
+                InvalidateFocusRectangle(immediate: true);
             }
         }
 
@@ -1822,7 +1909,7 @@ namespace FancyWM
                         DetectChanges(e.Source);
                         if (m_showFocus && m_movingWindow == null && m_currentInteraction == UserInteraction.None && Equals(m_workspace.FocusedWindow, e.Source))
                         {
-                            UpdateFocusRectangle();
+                            UpdateFocusRectangleDirect();
                         }
                     });
                     return;
@@ -2134,6 +2221,7 @@ namespace FancyWM
             m_currentInteraction = UserInteraction.Starting;
             if (m_showFocus)
             {
+                m_focusSettleCts?.Cancel();
                 m_gui.FocusRectangle = null;
             }
 
@@ -2504,7 +2592,7 @@ namespace FancyWM
 
         private void PropagateShowFocusChange()
         {
-            UpdateFocusRectangle();
+            InvalidateFocusRectangle(immediate: true);
             InvalidateLayout();
         }
 

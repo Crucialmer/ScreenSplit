@@ -33,7 +33,7 @@
                                 <BeginStoryboard>
                                     <Storyboard>
                                         <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                         From="0.2" To="1.0"
+                                                         From="0.0" To="1.0"
                                                          Duration="0:0:0.12" />
                                     </Storyboard>
                                 </BeginStoryboard>
@@ -42,6 +42,7 @@
                         <DataTrigger Binding="{Binding Path=IsFocusRectangleVisible}" Value="False">
                             <DataTrigger.Setters>
                                 <Setter Property="UIElement.Visibility" Value="Collapsed" />
+                                <Setter Property="UIElement.Opacity" Value="0" />
                             </DataTrigger.Setters>
                         </DataTrigger>
                     </Style.Triggers>

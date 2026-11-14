@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System.Threading;
+using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Threading;
 using System.Runtime.InteropServices;
@@ -189,6 +190,8 @@ namespace FancyWM
         private int m_windowPadding = 2;
         private bool m_showFocus = false;
         private bool m_showPreviewFocus = false;
+        private CancellationTokenSource? m_focusSettleCts;
+        private IWindow? m_currentFocusedTarget;
 
         private bool m_active = false;
         private bool m_dirty = true;
@@ -662,6 +665,9 @@ namespace FancyWM
 
             m_active = false;
             StopDragTrackingTimer();
+            m_focusSettleCts?.Cancel();
+            m_focusSettleCts?.Dispose();
+            m_focusSettleCts = null;
             m_subscriptions.Dispose();
 
             PlacementFailed = null;
