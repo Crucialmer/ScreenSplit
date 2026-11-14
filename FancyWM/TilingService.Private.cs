@@ -617,13 +617,6 @@ namespace FancyWM
                 Math.Abs(pos.Height - bottomH) <= tol)
                 return true;
 
-            // Maximized
-            if (Math.Abs(pos.Left - wa.Left) <= tol &&
-                Math.Abs(pos.Top - wa.Top) <= tol &&
-                Math.Abs(pos.Width - wa.Width) <= tol &&
-                Math.Abs(pos.Height - wa.Height) <= tol)
-                return true;
-
             // Top-Left Quarter
             if (Math.Abs(pos.Left - wa.Left) <= tol &&
                 Math.Abs(pos.Top - wa.Top) <= tol &&
@@ -745,8 +738,7 @@ namespace FancyWM
         private static bool IsValidFloatingDimensions(int w, int h, Rectangle wa)
         {
             if (w < 120 || h < 100) return false;
-            // 仅排除同时占据全屏宽与全屏高的真最大化窗口（非最大化的高窗口或宽窗口均属于合法浮动窗口）
-            if (w >= wa.Width - 15 && h >= wa.Height - 15) return false;
+            // 完整支持用户自定义的任意大小（包括铺满全屏 100% 宽度与高度的自定义窗口尺寸），不作人为排除
             return true;
         }
 
@@ -2158,8 +2150,8 @@ namespace FancyWM
                         targetH = isPortrait ? (int)(wa.Height * 0.75) : (int)(wa.Height * 0.65);
                     }
                 }
-                targetW = Math.Clamp(targetW, 100, (int)(wa.Width * 0.98));
-                targetH = Math.Clamp(targetH, 80, (int)(wa.Height * 0.98));
+                targetW = Math.Clamp(targetW, 100, wa.Width);
+                targetH = Math.Clamp(targetH, 80, wa.Height);
 
                 int targetX = pt.X - (int)(targetW * m_dragGrabRatioX);
                 int targetY = pt.Y - (int)(targetH * m_dragGrabRatioY);
@@ -2200,8 +2192,7 @@ namespace FancyWM
                     try
                     {
                         var curRect = GetVisibleWindowRectangle(window);
-                        if ((curRect.Width >= wa.Width * 0.45 && curRect.Height >= wa.Height * 0.45) ||
-                            Math.Abs(curRect.Width - capturedRestoredRect.Width) > 30 ||
+                        if (Math.Abs(curRect.Width - capturedRestoredRect.Width) > 30 ||
                             Math.Abs(curRect.Height - capturedRestoredRect.Height) > 30)
                         {
                             ApplyWindowSnap(window, capturedRestoredRect);
