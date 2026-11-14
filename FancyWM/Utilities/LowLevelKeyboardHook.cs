@@ -93,21 +93,33 @@ namespace FancyWM.Utilities
 
         private LRESULT HookProc(int code, WPARAM wParam, LPARAM lParam)
         {
-            if (code >= Constants.HC_ACTION)
+            try
             {
-                // Update the timestamp
-                m_lastActiveTimestamp = DateTime.UtcNow;
-
-                var kbhs = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
-                KeyCode keyCode = (KeyCode)kbhs.vkCode;
-                bool isPressed = (kbhs.flags & LLKHF_UP) == 0;
-                var e = new KeyStateChangedEventArgs(keyCode, isPressed);
-                KeyStateChanged?.Invoke(this, ref e);
-
-                if (e.Handled)
+                if (code >= Constants.HC_ACTION)
                 {
-                    return new(PInvoke.CallNextHookEx(new HHOOK(), code, wParam, lParam) | 1);
+                    // Update the timestamp
+                    m_lastActiveTimestamp = DateTime.UtcNow;
+
+                    var kbhs = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
+                    KeyCode keyCode = (KeyCode)kbhs.vkCode;
+                    bool isPressed = (kbhs.flags & LLKHF_UP) == 0;
+                    var e = new KeyStateChangedEventArgs(keyCode, isPressed);
+                    try
+                    {
+                        KeyStateChanged?.Invoke(this, ref e);
+                    }
+                    catch (Exception)
+                    {
+                    }
+
+                    if (e.Handled)
+                    {
+                        return new(PInvoke.CallNextHookEx(new HHOOK(), code, wParam, lParam) | 1);
+                    }
                 }
+            }
+            catch (Exception)
+            {
             }
 
             return PInvoke.CallNextHookEx(new HHOOK(), code, wParam, lParam);

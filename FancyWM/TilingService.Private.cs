@@ -392,6 +392,9 @@ namespace FancyWM
                 catch (OperationCanceledException)
                 {
                 }
+                catch (Exception)
+                {
+                }
             });
         }
 

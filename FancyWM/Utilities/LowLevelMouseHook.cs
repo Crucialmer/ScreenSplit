@@ -105,68 +105,80 @@ namespace FancyWM.Utilities
 
         private LRESULT HookProc(int code, WPARAM wParam, LPARAM lParam)
         {
-            if (code >= Constants.HC_ACTION)
+            try
             {
-                // Update the timestamp
-                m_lastActiveTimestamp = DateTime.UtcNow;
-
-                ButtonStateChangedEventArgs? e;
-                switch (wParam.Value)
+                if (code >= Constants.HC_ACTION)
                 {
-                    case Constants.WM_LBUTTONDOWN:
-                        {
-                            var mshs = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
-                            e = new ButtonStateChangedEventArgs(MouseButton.Left, true, mshs.pt.x, mshs.pt.y);
-                            break;
-                        }
+                    // Update the timestamp
+                    m_lastActiveTimestamp = DateTime.UtcNow;
 
-                    case Constants.WM_LBUTTONUP:
-                        {
-                            var mshs = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
-                            e = new ButtonStateChangedEventArgs(MouseButton.Left, false, mshs.pt.x, mshs.pt.y);
-                            break;
-                        }
-
-                    case Constants.WM_RBUTTONDOWN:
-                        {
-                            var mshs = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
-                            e = new ButtonStateChangedEventArgs(MouseButton.Right, true, mshs.pt.x, mshs.pt.y);
-                            break;
-                        }
-
-                    case Constants.WM_RBUTTONUP:
-                        {
-                            var mshs = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
-                            e = new ButtonStateChangedEventArgs(MouseButton.Right, false, mshs.pt.x, mshs.pt.y);
-                            break;
-                        }
-
-                    case Constants.WM_MBUTTONDOWN:
-                        {
-                            var mshs = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
-                            e = new ButtonStateChangedEventArgs(MouseButton.Middle, true, mshs.pt.x, mshs.pt.y);
-                            break;
-                        }
-
-                    case Constants.WM_MBUTTONUP:
-                        {
-                            var mshs = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
-                            e = new ButtonStateChangedEventArgs(MouseButton.Middle, false, mshs.pt.x, mshs.pt.y);
-                            break;
-                        }
-                    default:
-                        return PInvoke.CallNextHookEx(new HHOOK(), code, wParam, lParam);
-                }
-
-                if (e is ButtonStateChangedEventArgs evt)
-                {
-                    ButtonStateChanged?.Invoke(this, ref evt);
-
-                    if (evt.Handled)
+                    ButtonStateChangedEventArgs? e;
+                    switch (wParam.Value)
                     {
-                        return new(PInvoke.CallNextHookEx(new HHOOK(), code, wParam, lParam) | 1);
+                        case Constants.WM_LBUTTONDOWN:
+                            {
+                                var mshs = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
+                                e = new ButtonStateChangedEventArgs(MouseButton.Left, true, mshs.pt.x, mshs.pt.y);
+                                break;
+                            }
+
+                        case Constants.WM_LBUTTONUP:
+                            {
+                                var mshs = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
+                                e = new ButtonStateChangedEventArgs(MouseButton.Left, false, mshs.pt.x, mshs.pt.y);
+                                break;
+                            }
+
+                        case Constants.WM_RBUTTONDOWN:
+                            {
+                                var mshs = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
+                                e = new ButtonStateChangedEventArgs(MouseButton.Right, true, mshs.pt.x, mshs.pt.y);
+                                break;
+                            }
+
+                        case Constants.WM_RBUTTONUP:
+                            {
+                                var mshs = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
+                                e = new ButtonStateChangedEventArgs(MouseButton.Right, false, mshs.pt.x, mshs.pt.y);
+                                break;
+                            }
+
+                        case Constants.WM_MBUTTONDOWN:
+                            {
+                                var mshs = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
+                                e = new ButtonStateChangedEventArgs(MouseButton.Middle, true, mshs.pt.x, mshs.pt.y);
+                                break;
+                            }
+
+                        case Constants.WM_MBUTTONUP:
+                            {
+                                var mshs = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
+                                e = new ButtonStateChangedEventArgs(MouseButton.Middle, false, mshs.pt.x, mshs.pt.y);
+                                break;
+                            }
+                        default:
+                            return PInvoke.CallNextHookEx(new HHOOK(), code, wParam, lParam);
+                    }
+
+                    if (e is ButtonStateChangedEventArgs evt)
+                    {
+                        try
+                        {
+                            ButtonStateChanged?.Invoke(this, ref evt);
+                        }
+                        catch (Exception)
+                        {
+                        }
+
+                        if (evt.Handled)
+                        {
+                            return new(PInvoke.CallNextHookEx(new HHOOK(), code, wParam, lParam) | 1);
+                        }
                     }
                 }
+            }
+            catch (Exception)
+            {
             }
 
             return PInvoke.CallNextHookEx(new HHOOK(), code, wParam, lParam);

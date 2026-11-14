@@ -74,6 +74,7 @@ namespace FancyWM
         private readonly TaskbarIcon m_notifyIcon;
         private readonly CountdownTimer m_hideCountdownTimer;
         private readonly ContextMenu m_contextMenu;
+        private volatile bool m_isContextMenuOpen = false;
         private readonly bool m_explorerHasVirtualDesktopTooltip;
         private readonly LowLevelKeyboardHook m_llkbdHook;
         private KeybindingDictionary m_keybindings;
@@ -296,6 +297,7 @@ namespace FancyWM
 
             m_contextMenu.Opened += (s, e) =>
             {
+                m_isContextMenuOpen = true;
                 if (PresentationSource.FromVisual(m_contextMenu) is HwndSource hwndSource && hwndSource.Handle != IntPtr.Zero)
                 {
                     PInvoke.SetForegroundWindow(new(hwndSource.Handle));
@@ -303,6 +305,7 @@ namespace FancyWM
             };
             m_contextMenu.Closed += (s, e) =>
             {
+                m_isContextMenuOpen = false;
                 if (m_hwnd != IntPtr.Zero)
                 {
                     _ = PostMessage(m_hwnd, 0x0000 /* WM_NULL */, IntPtr.Zero, IntPtr.Zero);
@@ -382,6 +385,7 @@ namespace FancyWM
         {
             Dispatcher.InvokeAsync(() =>
             {
+                m_isContextMenuOpen = false;
                 m_contextMenu.IsOpen = false;
             });
 
@@ -1354,6 +1358,7 @@ namespace FancyWM
 
         private void OnNotifyIconLeftMouseDown(object? sender, RoutedEventArgs e)
         {
+            m_isContextMenuOpen = false;
             m_contextMenu.IsOpen = false;
             OpenSettings();
         }
@@ -1364,39 +1369,65 @@ namespace FancyWM
             {
                 PInvoke.SetForegroundWindow(new(m_hwnd));
             }
+            m_isContextMenuOpen = true;
             m_contextMenu.IsOpen = true;
         }
 
         private void OnGlobalMouseButtonStateChanged(object? sender, ref LowLevelMouseHook.ButtonStateChangedEventArgs e)
         {
-            if (e.IsPressed && m_contextMenu.IsOpen)
+            try
             {
-                int clickX = e.X;
-                int clickY = e.Y;
-                Dispatcher.BeginInvoke(new Action(() =>
+                // CRITICAL THREAD SAFETY:
+                // LowLevelMouseHook operates on LowLevelMouseHookThread.
+                // Never access m_contextMenu (WPF UI DependencyObject) directly here,
+                // which causes InvalidOperationException (cross-thread access crash).
+                // Use the volatile m_isContextMenuOpen flag to guard Dispatcher dispatching.
+                if (e.IsPressed && m_isContextMenuOpen)
                 {
-                    if (!m_contextMenu.IsOpen)
-                        return;
-
-                    if (PresentationSource.FromVisual(m_contextMenu) is HwndSource source && source.Handle != IntPtr.Zero)
+                    int clickX = e.X;
+                    int clickY = e.Y;
+                    Dispatcher.BeginInvoke(new Action(() =>
                     {
-                        if (PInvoke.GetWindowRect(new(source.Handle), out RECT rect))
+                        try
                         {
-                            if (clickX < rect.left || clickX > rect.right || clickY < rect.top || clickY > rect.bottom)
+                            if (!m_contextMenu.IsOpen)
+                            {
+                                m_isContextMenuOpen = false;
+                                return;
+                            }
+
+                            if (PresentationSource.FromVisual(m_contextMenu) is HwndSource source && source.Handle != IntPtr.Zero)
+                            {
+                                if (PInvoke.GetWindowRect(new(source.Handle), out RECT rect))
+                                {
+                                    if (clickX < rect.left || clickX > rect.right || clickY < rect.top || clickY > rect.bottom)
+                                    {
+                                        m_contextMenu.IsOpen = false;
+                                        m_isContextMenuOpen = false;
+                                    }
+                                }
+                                else
+                                {
+                                    m_contextMenu.IsOpen = false;
+                                    m_isContextMenuOpen = false;
+                                }
+                            }
+                            else
                             {
                                 m_contextMenu.IsOpen = false;
+                                m_isContextMenuOpen = false;
                             }
                         }
-                        else
+                        catch
                         {
                             m_contextMenu.IsOpen = false;
+                            m_isContextMenuOpen = false;
                         }
-                    }
-                    else
-                    {
-                        m_contextMenu.IsOpen = false;
-                    }
-                }), DispatcherPriority.Normal);
+                    }), DispatcherPriority.Normal);
+                }
+            }
+            catch
+            {
             }
         }
 
@@ -1657,18 +1688,21 @@ namespace FancyWM
 
         private void OnSettingsClick(object? sender, RoutedEventArgs e)
         {
+            m_isContextMenuOpen = false;
             m_contextMenu.IsOpen = false;
             OpenSettings();
         }
 
         private void OnCheckUpdatesClick(object? sender, RoutedEventArgs e)
         {
+            m_isContextMenuOpen = false;
             m_contextMenu.IsOpen = false;
             UpdateWindow.ShowUpdateDialog();
         }
 
         private async void OnRestoreSystemSnapClick(object? sender, RoutedEventArgs e)
         {
+            m_isContextMenuOpen = false;
             m_contextMenu.IsOpen = false;
             SystemSnapManager.RestoreSystemSnap();
             await ShowToastAsync("Windows 原生贴靠 (Aero Snap) 已恢复启用！", ToastDurationLong);
@@ -1677,6 +1711,7 @@ namespace FancyWM
         private void OnExitClick(object? sender, RoutedEventArgs e)
         {
             m_logger.Debug("Application exit requested!");
+            m_isContextMenuOpen = false;
             m_contextMenu.IsOpen = false;
             SystemSnapManager.RestoreSystemSnap();
             App.Current.Terminate();
@@ -1690,6 +1725,7 @@ namespace FancyWM
         private void OnAboutClick(object? sender, RoutedEventArgs e)
         {
             m_logger.Debug("Opening about window...");
+            m_isContextMenuOpen = false;
             m_contextMenu.IsOpen = false;
             new AboutWindow().Show();
         }

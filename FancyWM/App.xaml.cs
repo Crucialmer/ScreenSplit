@@ -79,7 +79,7 @@ namespace FancyWM
                 {
                     var path = Environment.ProcessPath ?? Assembly.GetEntryAssembly()?.Location;
                     var versionInfo = !string.IsNullOrEmpty(path) ? FileVersionInfo.GetVersionInfo(path) : null;
-                    return versionInfo?.FileVersion ?? "1.0.5.0";
+                    return versionInfo?.FileVersion ?? "1.0.6.0";
                 }
             }
         }
@@ -100,6 +100,11 @@ namespace FancyWM
             Logger = services.GetRequiredService<ILogger>();
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
             DispatcherUnhandledException += OnDispatcherUnhandledException;
+            TaskScheduler.UnobservedTaskException += (sender, e) =>
+            {
+                Logger?.Error(e.Exception, "Unobserved task exception caught and suppressed");
+                e.SetObserved();
+            };
         }
 
         private void OnDispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
