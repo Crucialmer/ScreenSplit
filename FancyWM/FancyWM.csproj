@@ -15,7 +15,7 @@
     <PackageIcon>Icon.png</PackageIcon>
     <Platforms>AnyCPU;x64;x86</Platforms>
     <StartupObject>FancyWM.Startup</StartupObject>
-    <Version>1.0.6</Version>
+    <Version>1.0.7</Version>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
     <Nullable>enable</Nullable>

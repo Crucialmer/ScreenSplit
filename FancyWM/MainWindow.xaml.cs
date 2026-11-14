@@ -64,9 +64,6 @@ namespace FancyWM
         private IDisplay? m_prevDisplay = null;
         private IDisplay? m_currentDisplay = null;
 
-        [DllImport("user32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
         private LowLevelHotkey[]? m_cmdHks;
         private LowLevelHotkey? m_capsLockHk;
@@ -74,7 +71,6 @@ namespace FancyWM
         private readonly TaskbarIcon m_notifyIcon;
         private readonly CountdownTimer m_hideCountdownTimer;
         private readonly ContextMenu m_contextMenu;
-        private volatile bool m_isContextMenuOpen = false;
         private readonly bool m_explorerHasVirtualDesktopTooltip;
         private readonly LowLevelKeyboardHook m_llkbdHook;
         private KeybindingDictionary m_keybindings;
@@ -125,7 +121,6 @@ namespace FancyWM
 
             m_mouseHook = App.Current.Services.GetRequiredService<LowLevelMouseHook>();
             m_mvm = new ModifierWindowMover(m_workspace, m_mouseHook);
-            m_mouseHook.ButtonStateChanged += OnGlobalMouseButtonStateChanged;
 
             var settings = App.Current.AppState.Settings
                 .Do(x => m_keybindings = x.Keybindings)
@@ -295,23 +290,6 @@ namespace FancyWM
             m_hideCountdownTimer = new CountdownTimer();
             m_contextMenu = (ContextMenu)FindResource("NotifierContextMenu");
 
-            m_contextMenu.Opened += (s, e) =>
-            {
-                m_isContextMenuOpen = true;
-                if (PresentationSource.FromVisual(m_contextMenu) is HwndSource hwndSource && hwndSource.Handle != IntPtr.Zero)
-                {
-                    PInvoke.SetForegroundWindow(new(hwndSource.Handle));
-                }
-            };
-            m_contextMenu.Closed += (s, e) =>
-            {
-                m_isContextMenuOpen = false;
-                if (m_hwnd != IntPtr.Zero)
-                {
-                    _ = PostMessage(m_hwnd, 0x0000 /* WM_NULL */, IntPtr.Zero, IntPtr.Zero);
-                }
-            };
-
             m_notifyIcon = new TaskbarIcon
             {
                 Icon = appIcon ?? System.Drawing.SystemIcons.Application,
@@ -320,7 +298,6 @@ namespace FancyWM
                 ContextMenu = m_contextMenu,
             };
             m_notifyIcon.TrayLeftMouseDown += OnNotifyIconLeftMouseDown;
-            m_notifyIcon.TrayRightMouseDown += OnNotifyIconRightMouseDown;
             m_explorerHasVirtualDesktopTooltip = ExplorerFeature.HasVirtualDesktopTooltip();
 
             m_stopwatch = new Stopwatch();
@@ -383,12 +360,6 @@ namespace FancyWM
 
         private void OnFocusedWindowChanged(object? sender, FocusedWindowChangedEventArgs e)
         {
-            Dispatcher.InvokeAsync(() =>
-            {
-                m_isContextMenuOpen = false;
-                m_contextMenu.IsOpen = false;
-            });
-
             if (e.NewFocusedWindow != null)
             {
                 var currentDisplay = m_workspace.DisplayManager.Displays.FirstOrDefault(x => x.Bounds.Contains(e.NewFocusedWindow.Position.Center));
@@ -1358,77 +1329,8 @@ namespace FancyWM
 
         private void OnNotifyIconLeftMouseDown(object? sender, RoutedEventArgs e)
         {
-            m_isContextMenuOpen = false;
             m_contextMenu.IsOpen = false;
             OpenSettings();
-        }
-
-        private void OnNotifyIconRightMouseDown(object? sender, RoutedEventArgs e)
-        {
-            if (m_hwnd != IntPtr.Zero)
-            {
-                PInvoke.SetForegroundWindow(new(m_hwnd));
-            }
-            m_isContextMenuOpen = true;
-            m_contextMenu.IsOpen = true;
-        }
-
-        private void OnGlobalMouseButtonStateChanged(object? sender, ref LowLevelMouseHook.ButtonStateChangedEventArgs e)
-        {
-            try
-            {
-                // CRITICAL THREAD SAFETY:
-                // LowLevelMouseHook operates on LowLevelMouseHookThread.
-                // Never access m_contextMenu (WPF UI DependencyObject) directly here,
-                // which causes InvalidOperationException (cross-thread access crash).
-                // Use the volatile m_isContextMenuOpen flag to guard Dispatcher dispatching.
-                if (e.IsPressed && m_isContextMenuOpen)
-                {
-                    int clickX = e.X;
-                    int clickY = e.Y;
-                    Dispatcher.BeginInvoke(new Action(() =>
-                    {
-                        try
-                        {
-                            if (!m_contextMenu.IsOpen)
-                            {
-                                m_isContextMenuOpen = false;
-                                return;
-                            }
-
-                            if (PresentationSource.FromVisual(m_contextMenu) is HwndSource source && source.Handle != IntPtr.Zero)
-                            {
-                                if (PInvoke.GetWindowRect(new(source.Handle), out RECT rect))
-                                {
-                                    if (clickX < rect.left || clickX > rect.right || clickY < rect.top || clickY > rect.bottom)
-                                    {
-                                        m_contextMenu.IsOpen = false;
-                                        m_isContextMenuOpen = false;
-                                    }
-                                }
-                                else
-                                {
-                                    m_contextMenu.IsOpen = false;
-                                    m_isContextMenuOpen = false;
-                                }
-                            }
-                            else
-                            {
-                                m_contextMenu.IsOpen = false;
-                                m_isContextMenuOpen = false;
-                            }
-                        }
-                        catch
-                        {
-                            m_contextMenu.IsOpen = false;
-                            m_isContextMenuOpen = false;
-                        }
-                    }), DispatcherPriority.Normal);
-                }
-            }
-            catch
-            {
-            }
         }
 
         private async void OnVirtualDesktopChanged(object? sender, CurrentDesktopChangedEventArgs e)
@@ -1688,21 +1590,18 @@ namespace FancyWM
 
         private void OnSettingsClick(object? sender, RoutedEventArgs e)
         {
-            m_isContextMenuOpen = false;
             m_contextMenu.IsOpen = false;
             OpenSettings();
         }
 
         private void OnCheckUpdatesClick(object? sender, RoutedEventArgs e)
         {
-            m_isContextMenuOpen = false;
             m_contextMenu.IsOpen = false;
             UpdateWindow.ShowUpdateDialog();
         }
 
         private async void OnRestoreSystemSnapClick(object? sender, RoutedEventArgs e)
         {
-            m_isContextMenuOpen = false;
             m_contextMenu.IsOpen = false;
             SystemSnapManager.RestoreSystemSnap();
             await ShowToastAsync("Windows 原生贴靠 (Aero Snap) 已恢复启用！", ToastDurationLong);
@@ -1711,7 +1610,6 @@ namespace FancyWM
         private void OnExitClick(object? sender, RoutedEventArgs e)
         {
             m_logger.Debug("Application exit requested!");
-            m_isContextMenuOpen = false;
             m_contextMenu.IsOpen = false;
             SystemSnapManager.RestoreSystemSnap();
             App.Current.Terminate();
@@ -1725,7 +1623,6 @@ namespace FancyWM
         private void OnAboutClick(object? sender, RoutedEventArgs e)
         {
             m_logger.Debug("Opening about window...");
-            m_isContextMenuOpen = false;
             m_contextMenu.IsOpen = false;
             new AboutWindow().Show();
         }
@@ -1776,10 +1673,6 @@ namespace FancyWM
             m_logger.Debug($"Closing all other subscriptions...");
             m_subscriptions?.Dispose();
 
-            if (m_mouseHook != null)
-            {
-                m_mouseHook.ButtonStateChanged -= OnGlobalMouseButtonStateChanged;
-            }
             m_notifyIcon?.Dispose();
         }
     }
