@@ -178,6 +178,8 @@ namespace FancyWM
         private readonly Utilities.DebugLock m_preSnapRectanglesLock = new(LockThreshold);
         private readonly HashSet<IWindow> m_snappedWindows = [];
         private readonly Utilities.DebugLock m_snappedWindowsLock = new(LockThreshold);
+        private readonly Dictionary<IWindow, Rectangle> m_lastFloatingRectangles = [];
+        private readonly Utilities.DebugLock m_lastFloatingRectanglesLock = new(LockThreshold);
         private double m_dragGrabRatioX = 0.5;
         private double m_dragGrabRatioY = 0.1;
         private IWindow? m_movingWindow;
@@ -187,6 +189,7 @@ namespace FancyWM
         private readonly DispatcherTimer m_dragTrackingTimer;
         private bool m_isExternalDrag = false;
         private IWindow? m_potentialExternalDragWindow = null;
+        private Rectangle m_potentialExternalDragInitialPos = default;
         private int m_externalDragFrameCount = 0;
         private TimeSpan m_lastExternalDragTime = TimeSpan.Zero;
         private readonly DispatcherTimer m_externalDragWatchdogTimer;

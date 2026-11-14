@@ -655,6 +655,108 @@ namespace FancyWM
         private static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out RECT pvAttribute, int cbAttribute);
         private const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
 
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetWindowPlacement(IntPtr hWnd, ref WINDOWPLACEMENT lpwndpl);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct POINT
+        {
+            public int x;
+            public int y;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct WINDOWPLACEMENT
+        {
+            public int length;
+            public int flags;
+            public int showCmd;
+            public POINT ptMinPosition;
+            public POINT ptMaxPosition;
+            public RECT rcNormalPosition;
+        }
+
+        private static Rectangle? GetWindowRestoredRectangle(IWindow window)
+        {
+            try
+            {
+                WINDOWPLACEMENT wp = new() { length = Marshal.SizeOf<WINDOWPLACEMENT>() };
+                if (GetWindowPlacement(window.Handle, ref wp))
+                {
+                    var rc = wp.rcNormalPosition;
+                    int width = rc.right - rc.left;
+                    int height = rc.bottom - rc.top;
+                    if (width > 0 && height > 0)
+                    {
+                        return new Rectangle(rc.left, rc.top, rc.right, rc.bottom);
+                    }
+                }
+            }
+            catch
+            {
+            }
+            return null;
+        }
+
+        private Rectangle GetBestFloatingRectangle(IWindow window, Rectangle wa, Rectangle fallbackPos)
+        {
+            // 1. Check existing pre-snap memory
+            using (m_preSnapRectanglesLock.EnterScope())
+            {
+                if (m_preSnapRectangles.TryGetValue(window, out var preRect) &&
+                    preRect.Width > 100 && preRect.Height > 80 &&
+                    (preRect.Width < wa.Width * 0.92 || preRect.Height < wa.Height * 0.92) &&
+                    !IsWindowSnappedGeometry(preRect, wa))
+                {
+                    return preRect;
+                }
+            }
+
+            // 2. Check active drag original rect (captured before current move)
+            using (m_preSnapRectanglesLock.EnterScope())
+            {
+                if (m_activeDragOriginalRect.TryGetValue(window, out var origRect) &&
+                    origRect.Width > 100 && origRect.Height > 80 &&
+                    (origRect.Width < wa.Width * 0.92 || origRect.Height < wa.Height * 0.92) &&
+                    !IsWindowSnappedGeometry(origRect, wa))
+                {
+                    return origRect;
+                }
+            }
+
+            // 3. Check continuous floating memory
+            using (m_lastFloatingRectanglesLock.EnterScope())
+            {
+                if (m_lastFloatingRectangles.TryGetValue(window, out var lastFloat) &&
+                    lastFloat.Width > 100 && lastFloat.Height > 80 &&
+                    (lastFloat.Width < wa.Width * 0.92 || lastFloat.Height < wa.Height * 0.92) &&
+                    !IsWindowSnappedGeometry(lastFloat, wa))
+                {
+                    return lastFloat;
+                }
+            }
+
+            // 4. Check Windows OS placement rcNormalPosition
+            var wpRect = GetWindowRestoredRectangle(window);
+            if (wpRect.HasValue &&
+                wpRect.Value.Width > 100 && wpRect.Value.Height > 80 &&
+                (wpRect.Value.Width < wa.Width * 0.92 || wpRect.Value.Height < wa.Height * 0.92) &&
+                !IsWindowSnappedGeometry(wpRect.Value, wa))
+            {
+                return wpRect.Value;
+            }
+
+            // 5. Fallback: intelligent default size
+            bool isPortrait = fallbackPos.Width > 0 && fallbackPos.Height > 0 && fallbackPos.Width < fallbackPos.Height;
+            int defaultW = isPortrait ? (int)(wa.Height * 0.45) : (int)(wa.Width * 0.60);
+            int defaultH = isPortrait ? (int)(wa.Height * 0.75) : (int)(wa.Height * 0.65);
+            return Rectangle.OffsetAndSize(
+                wa.Left + (wa.Width - defaultW) / 2,
+                wa.Top + (wa.Height - defaultH) / 2,
+                defaultW, defaultH);
+        }
+
         private static Rectangle GetVisibleWindowRectangle(IWindow window)
         {
             try
@@ -940,9 +1042,10 @@ namespace FancyWM
             }
         }
 
-        private void StartExternalDrag(IWindow window, Rectangle pos, Point cursor)
+        private void StartExternalDrag(IWindow window, Rectangle pos, Rectangle initialPos, Point cursor)
         {
-            m_logger.Information("[Drag] StartExternalDrag on {Window}, Pos={Pos}, Cursor={Cursor}", window.DebugString(), pos, cursor);
+            m_logger.Information("[Drag] StartExternalDrag on {Window}, Pos={Pos}, InitialPos={InitialPos}, Cursor={Cursor}",
+                window.DebugString(), pos, initialPos, cursor);
 
             using (m_ignoreRepositionSetLock.EnterScope())
             {
@@ -972,42 +1075,57 @@ namespace FancyWM
             }
 
             var wa = m_display.WorkArea;
-            bool wasSnapped = IsWindowSnapped(window, pos, wa);
-            Rectangle preSnapRect = default;
-            bool hasPreSnap = false;
-
-            using (m_preSnapRectanglesLock.EnterScope())
+            bool wasSnapped = false;
+            using (m_snappedWindowsLock.EnterScope())
             {
-                hasPreSnap = m_preSnapRectangles.TryGetValue(window, out preSnapRect);
-                if (!wasSnapped)
+                if (m_snappedWindows.Contains(window))
+                    wasSnapped = true;
+            }
+            if (!wasSnapped)
+            {
+                using (m_preSnapRectanglesLock.EnterScope())
                 {
-                    m_activeDragOriginalRect[window] = pos;
+                    if (m_preSnapRectangles.ContainsKey(window))
+                        wasSnapped = true;
                 }
+            }
+            if (!wasSnapped)
+            {
+                wasSnapped = (initialPos.Width > 0 && IsWindowSnappedGeometry(initialPos, wa)) ||
+                             IsWindowSnappedGeometry(pos, wa);
             }
 
             if (wasSnapped)
             {
                 m_isDraggingSnappedWindow = true;
-                if (!hasPreSnap || preSnapRect.Width <= 0 || preSnapRect.Height <= 0)
+                using (m_snappedWindowsLock.EnterScope())
                 {
-                    bool isPortrait = pos.Width > 0 && pos.Height > 0 && pos.Width < pos.Height;
-                    int defaultW = isPortrait ? (int)(wa.Height * 0.45) : (int)(wa.Width * 0.60);
-                    int defaultH = isPortrait ? (int)(wa.Height * 0.75) : (int)(wa.Height * 0.65);
-                    preSnapRect = Rectangle.OffsetAndSize(
-                        wa.Left + (wa.Width - defaultW) / 2,
-                        wa.Top + (wa.Height - defaultH) / 2,
-                        defaultW, defaultH);
-                    using (m_preSnapRectanglesLock.EnterScope())
-                    {
-                        m_preSnapRectangles[window] = preSnapRect;
-                    }
+                    m_snappedWindows.Add(window);
+                }
+                var preSnapRect = GetBestFloatingRectangle(window, wa, pos);
+                using (m_preSnapRectanglesLock.EnterScope())
+                {
+                    m_preSnapRectangles[window] = preSnapRect;
                 }
                 m_currentDragTargetSize = new Point(preSnapRect.Width, preSnapRect.Height);
             }
             else
             {
                 m_isDraggingSnappedWindow = false;
-                m_currentDragTargetSize = new Point(pos.Width, pos.Height);
+                var origRect = initialPos.Width > 0 ? initialPos : pos;
+                using (m_preSnapRectanglesLock.EnterScope())
+                {
+                    m_activeDragOriginalRect[window] = origRect;
+                }
+                using (m_lastFloatingRectanglesLock.EnterScope())
+                {
+                    if (origRect.Width > 100 && origRect.Height > 80 &&
+                        (origRect.Width < wa.Width * 0.92 || origRect.Height < wa.Height * 0.92))
+                    {
+                        m_lastFloatingRectangles[window] = origRect;
+                    }
+                }
+                m_currentDragTargetSize = new Point(origRect.Width, origRect.Height);
             }
 
             StartDragTrackingTimer();
@@ -1024,6 +1142,7 @@ namespace FancyWM
             m_movingWindow = null;
             m_isExternalDrag = false;
             m_potentialExternalDragWindow = null;
+            m_potentialExternalDragInitialPos = default;
             m_externalDragFrameCount = 0;
 
             m_externalDragWatchdogTimer.Stop();
@@ -1797,6 +1916,10 @@ namespace FancyWM
                 m_preSnapRectangles.Remove(e.Source);
                 m_activeDragOriginalRect.Remove(e.Source);
             }
+            using (m_lastFloatingRectanglesLock.EnterScope())
+            {
+                m_lastFloatingRectangles.Remove(e.Source);
+            }
             using (m_snappedWindowsLock.EnterScope())
             {
                 m_snappedWindows.Remove(e.Source);
@@ -1845,29 +1968,26 @@ namespace FancyWM
                     // 记录停靠前的原始窗口状态（仅首次记录，避免在边缘间反复切换时丢失原始浮动大小）
                     using (m_preSnapRectanglesLock.EnterScope())
                     {
-                        if (m_activeDragOriginalRect.TryGetValue(window, out var origDragRect))
+                        if (m_activeDragOriginalRect.TryGetValue(window, out var origDragRect) &&
+                            origDragRect.Width > 100 && origDragRect.Height > 80 &&
+                            (origDragRect.Width < wa.Width * 0.92 || origDragRect.Height < wa.Height * 0.92) &&
+                            !IsWindowSnappedGeometry(origDragRect, wa))
                         {
                             m_preSnapRectangles[window] = origDragRect;
+                            using (m_lastFloatingRectanglesLock.EnterScope())
+                            {
+                                m_lastFloatingRectangles[window] = origDragRect;
+                            }
                             m_activeDragOriginalRect.Remove(window);
                         }
-                        else if (!m_preSnapRectangles.ContainsKey(window))
+                        else if (!m_preSnapRectangles.ContainsKey(window) ||
+                                 IsWindowSnappedGeometry(m_preSnapRectangles[window], wa))
                         {
-                            var currentPos = GetVisibleWindowRectangle(window);
-                            if (currentPos.Width > 0 && currentPos.Height > 0 &&
-                                (currentPos.Width < wa.Width * 0.95 || currentPos.Height < wa.Height * 0.95) &&
-                                !IsWindowSnapped(window, currentPos, wa))
+                            var bestFloat = GetBestFloatingRectangle(window, wa, GetVisibleWindowRectangle(window));
+                            m_preSnapRectangles[window] = bestFloat;
+                            using (m_lastFloatingRectanglesLock.EnterScope())
                             {
-                                m_preSnapRectangles[window] = currentPos;
-                            }
-                            else
-                            {
-                                bool isPortrait = currentPos.Width > 0 && currentPos.Height > 0 && currentPos.Width < currentPos.Height;
-                                int defaultW = isPortrait ? (int)(wa.Height * 0.45) : (int)(wa.Width * 0.60);
-                                int defaultH = isPortrait ? (int)(wa.Height * 0.75) : (int)(wa.Height * 0.65);
-                                m_preSnapRectangles[window] = Rectangle.OffsetAndSize(
-                                    wa.Left + (wa.Width - defaultW) / 2,
-                                    wa.Top + (wa.Height - defaultH) / 2,
-                                    defaultW, defaultH);
+                                m_lastFloatingRectangles[window] = bestFloat;
                             }
                         }
                     }
@@ -1915,14 +2035,7 @@ namespace FancyWM
 
             if (!hadPreSnap && m_isDraggingSnappedWindow)
             {
-                var curPos = GetVisibleWindowRectangle(window);
-                bool isPortrait = curPos.Width > 0 && curPos.Height > 0 && curPos.Width < curPos.Height;
-                int defaultW = isPortrait ? (int)(wa.Height * 0.45) : (int)(wa.Width * 0.60);
-                int defaultH = isPortrait ? (int)(wa.Height * 0.75) : (int)(wa.Height * 0.65);
-                preSnapRect = Rectangle.OffsetAndSize(
-                    wa.Left + (wa.Width - defaultW) / 2,
-                    wa.Top + (wa.Height - defaultH) / 2,
-                    defaultW, defaultH);
+                preSnapRect = GetBestFloatingRectangle(window, wa, GetVisibleWindowRectangle(window));
                 hadPreSnap = true;
             }
 
@@ -1953,6 +2066,16 @@ namespace FancyWM
 
                 var restoredRect = Rectangle.OffsetAndSize(targetX, targetY, targetW, targetH);
                 ApplyWindowSnap(window, restoredRect);
+
+                // 持续保留该真实浮动大小记忆，供后续再次贴靠或拖出使用
+                using (m_lastFloatingRectanglesLock.EnterScope())
+                {
+                    m_lastFloatingRectangles[window] = restoredRect;
+                }
+                using (m_preSnapRectanglesLock.EnterScope())
+                {
+                    m_preSnapRectangles[window] = restoredRect;
+                }
             }
             m_isDraggingSnappedWindow = false;
             m_isDraggingTitleBar = false;
@@ -2091,13 +2214,14 @@ namespace FancyWM
                                 if (m_externalDragFrameCount >= 2)
                                 {
                                     // Confirmed external drag!
-                                    StartExternalDrag(e.Source, e.NewPosition, cursor);
+                                    StartExternalDrag(e.Source, e.NewPosition, m_potentialExternalDragInitialPos, cursor);
                                     return;
                                 }
                             }
                             else
                             {
                                 m_potentialExternalDragWindow = e.Source;
+                                m_potentialExternalDragInitialPos = e.OldPosition;
                                 m_externalDragFrameCount = 1;
                                 m_lastExternalDragTime = m_sw.Elapsed;
                             }
@@ -2106,6 +2230,7 @@ namespace FancyWM
                     else if (!isLeftButtonDown)
                     {
                         m_potentialExternalDragWindow = null;
+                        m_potentialExternalDragInitialPos = default;
                         m_externalDragFrameCount = 0;
                     }
 
@@ -2126,6 +2251,20 @@ namespace FancyWM
             if (m_isExternalDrag && Equals(m_movingWindow, e.Source))
             {
                 m_lastExternalDragTime = m_sw.Elapsed;
+            }
+
+            // 实时记录正常浮动窗口的尺寸与位置，防止窗口在各种方式贴靠后丢失记忆
+            var curWa = m_display.WorkArea;
+            var curPos = e.NewPosition;
+            if (curPos.Width > 150 && curPos.Height > 100 &&
+                (curPos.Width < curWa.Width * 0.92 || curPos.Height < curWa.Height * 0.92) &&
+                !IsWindowSnapped(e.Source, curPos, curWa) &&
+                !m_isExternalDrag && m_currentInteraction == UserInteraction.None)
+            {
+                using (m_lastFloatingRectanglesLock.EnterScope())
+                {
+                    m_lastFloatingRectangles[e.Source] = curPos;
+                }
             }
 
             bool isSizePreserved = Math.Abs(e.OldPosition.Width - e.NewPosition.Width) <= 5 &&
@@ -2457,31 +2596,36 @@ namespace FancyWM
             }
 
             var wa = m_display.WorkArea;
-            bool wasSnapped = IsWindowSnapped(e.Source, startPos, wa);
-            Rectangle preSnapRect = default;
-            bool hasPreSnap = false;
-
-            using (m_preSnapRectanglesLock.EnterScope())
+            bool wasSnapped = false;
+            using (m_snappedWindowsLock.EnterScope())
             {
-                hasPreSnap = m_preSnapRectangles.TryGetValue(e.Source, out preSnapRect);
+                if (m_snappedWindows.Contains(e.Source))
+                    wasSnapped = true;
+            }
+            if (!wasSnapped)
+            {
+                using (m_preSnapRectanglesLock.EnterScope())
+                {
+                    if (m_preSnapRectangles.ContainsKey(e.Source))
+                        wasSnapped = true;
+                }
+            }
+            if (!wasSnapped)
+            {
+                wasSnapped = IsWindowSnappedGeometry(startPos, wa);
             }
 
             if (wasSnapped)
             {
                 m_isDraggingSnappedWindow = true;
-                if (!hasPreSnap || preSnapRect.Width <= 0 || preSnapRect.Height <= 0)
+                using (m_snappedWindowsLock.EnterScope())
                 {
-                    bool isPortrait = startPos.Width > 0 && startPos.Height > 0 && startPos.Width < startPos.Height;
-                    int defaultW = isPortrait ? (int)(wa.Height * 0.45) : (int)(wa.Width * 0.60);
-                    int defaultH = isPortrait ? (int)(wa.Height * 0.75) : (int)(wa.Height * 0.65);
-                    preSnapRect = Rectangle.OffsetAndSize(
-                        wa.Left + (wa.Width - defaultW) / 2,
-                        wa.Top + (wa.Height - defaultH) / 2,
-                        defaultW, defaultH);
-                    using (m_preSnapRectanglesLock.EnterScope())
-                    {
-                        m_preSnapRectangles[e.Source] = preSnapRect;
-                    }
+                    m_snappedWindows.Add(e.Source);
+                }
+                var preSnapRect = GetBestFloatingRectangle(e.Source, wa, startPos);
+                using (m_preSnapRectanglesLock.EnterScope())
+                {
+                    m_preSnapRectangles[e.Source] = preSnapRect;
                 }
                 m_currentDragTargetSize = new WinMan.Point(preSnapRect.Width, preSnapRect.Height);
             }
@@ -2490,8 +2634,15 @@ namespace FancyWM
                 m_isDraggingSnappedWindow = false;
                 using (m_preSnapRectanglesLock.EnterScope())
                 {
-                    m_preSnapRectangles.Remove(e.Source);
                     m_activeDragOriginalRect[e.Source] = startPos;
+                }
+                using (m_lastFloatingRectanglesLock.EnterScope())
+                {
+                    if (startPos.Width > 100 && startPos.Height > 80 &&
+                        (startPos.Width < wa.Width * 0.92 || startPos.Height < wa.Height * 0.92))
+                    {
+                        m_lastFloatingRectangles[e.Source] = startPos;
+                    }
                 }
                 m_currentDragTargetSize = new WinMan.Point(startPos.Width, startPos.Height);
             }
