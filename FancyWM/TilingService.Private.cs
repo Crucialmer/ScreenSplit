@@ -878,9 +878,10 @@ namespace FancyWM
         private ScreenSnapZone GetSnapZone(Point pt, Rectangle wa)
         {
             double scale = m_display.Scaling > 0 ? m_display.Scaling : 1.0;
-            int edgeMargin = Math.Max(16, (int)(20 * scale));
-            // Corner hotzone (1/4 layout): Ergonomic sweet spot (~26 DIP, matching cursor bounding box size)
-            int cornerSize = Math.Max(20, (int)(26 * scale));
+            // 贴靠最边缘触发阈值：紧贴物理屏幕边框（~2-3 像素，不向屏幕内延伸，保留最大的自由浮动空间）
+            int edgeMargin = Math.Max(3, (int)Math.Round(2.5 * scale));
+            // 最顶点触发阈值：仅在屏幕四个顶角极小区域（~4-5 像素，顶点精准触发 1/4 分屏）
+            int cornerSize = Math.Max(4, (int)Math.Round(3.5 * scale));
 
             // 1. Four Corners (1/4 Layout) - Must be within corner threshold in both X and Y
             if (pt.X <= wa.Left + cornerSize && pt.Y <= wa.Top + cornerSize)
