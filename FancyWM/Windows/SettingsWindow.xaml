@@ -40,7 +40,7 @@
                         </Border>
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="ScreenSplit" FontWeight="SemiBold" FontSize="15" Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}" />
-                            <TextBlock Text="v1.0.0 · 纯绿色便携" FontSize="11" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,1,0,0" />
+                            <TextBlock Text="v1.0.1 · 纯绿色便携" FontSize="11" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,1,0,0" />
                         </StackPanel>
                     </StackPanel>
                 </Border>

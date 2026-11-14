@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using FancyWM.Utilities;
 
 using WinMan;
+using WinMan.Windows;
 using FancyWM.Layouts.Tiling;
 using FancyWM.Layouts;
 using System.Windows.Input;
@@ -310,16 +311,133 @@ namespace FancyWM
 
         private bool CanShowFocusRectangle()
         {
-            return m_showFocus && m_currentInteraction == UserInteraction.None && m_movingPanelNode == null;
+            return m_showFocus && m_currentInteraction == UserInteraction.None && m_movingPanelNode == null && m_movingWindow == null;
+        }
+
+        private void UpdateFocusRectangle()
+        {
+            if (!m_dispatcher.CheckAccess())
+            {
+                m_dispatcher.InvokeAsync(UpdateFocusRectangle, System.Windows.Threading.DispatcherPriority.DataBind);
+                return;
+            }
+
+            if (!m_active || !CanShowFocusRectangle())
+            {
+                m_gui.FocusRectangle = null;
+                return;
+            }
+
+            TilingNode? focusedNode = null;
+            try
+            {
+                var desktop = m_workspace.VirtualDesktopManager.CurrentDesktop;
+                using (m_backendLock.EnterScope())
+                {
+                    focusedNode = m_backend.GetFocus(desktop);
+                }
+            }
+            catch
+            {
+            }
+
+            m_gui.FocusRectangle = GetFocusRectangle(focusedNode);
         }
 
         private Rectangle? GetFocusRectangle(TilingNode? focusedNode)
         {
-            if (focusedNode is WindowNode focusedWindow && CanShowFocusRectangle())
+            if (!CanShowFocusRectangle())
+            {
+                return null;
+            }
+
+            if (focusedNode is WindowNode focusedWindow)
             {
                 return focusedWindow.ComputedRectangle;
             }
-            return null;
+
+            try
+            {
+                var focused = m_workspace.FocusedWindow;
+                if (focused == null || !focused.IsAlive)
+                {
+                    return null;
+                }
+
+                if (focused.State != WindowState.Restored)
+                {
+                    return null;
+                }
+
+                if (focused.IsTopmost)
+                {
+                    return null;
+                }
+
+                if (m_workspace.VirtualDesktopManager.IsWindowPinned(focused))
+                {
+                    return null;
+                }
+
+                if (focused is Win32Window win32Window)
+                {
+                    var cls = win32Window.ClassName;
+                    if (cls == "Progman" || cls == "WorkerW" || cls == "Shell_TrayWnd" || cls == "Shell_SecondaryTrayWnd")
+                    {
+                        return null;
+                    }
+                }
+
+                try
+                {
+                    var proc = focused.GetProcess();
+                    if (proc.Id == Environment.ProcessId ||
+                        proc.ProcessName.Equals("ScreenSplit", StringComparison.OrdinalIgnoreCase) ||
+                        proc.ProcessName.Equals("FancyWM", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return null;
+                    }
+                }
+                catch
+                {
+                }
+
+                if (m_exclusionMatchers.Any(matcher => matcher.Matches(focused)))
+                {
+                    return null;
+                }
+
+                var rect = GetVisibleWindowRectangle(focused);
+                if (rect.Width <= 0 || rect.Height <= 0)
+                {
+                    rect = focused.Position;
+                }
+
+                if (rect.Width <= 0 || rect.Height <= 0)
+                {
+                    return null;
+                }
+
+                if (!m_display.Bounds.Contains(rect.Center))
+                {
+                    return null;
+                }
+
+                return rect;
+            }
+            catch (InvalidWindowReferenceException)
+            {
+                return null;
+            }
+            catch (Win32Exception)
+            {
+                return null;
+            }
+            catch (Exception ex)
+            {
+                m_logger.Debug(ex, "Failed to compute focus rectangle for focused window");
+                return null;
+            }
         }
 
         private void SetPreviewRectangle(Rectangle? rect, string? title = null)
@@ -1248,6 +1366,20 @@ namespace FancyWM
             InvalidateLayout();
         }
 
+        private void OnWorkspaceFocusedWindowChanged(object? sender, FocusedWindowChangedEventArgs e)
+        {
+            if (!m_active)
+                return;
+
+            m_dispatcher.InvokeAsync(() =>
+            {
+                if (m_showFocus)
+                {
+                    UpdateFocusRectangle();
+                }
+            }, System.Windows.Threading.DispatcherPriority.DataBind);
+        }
+
         private void OnWindowGotFocus(object? sender, WindowFocusChangedEventArgs e)
         {
             m_dispatcher.BeginInvoke(() =>
@@ -1269,6 +1401,10 @@ namespace FancyWM
                         else
                         {
                             m_logger.Debug("Window {Window} is not managed by backend", e.Source.DebugString());
+                            if (m_showFocus)
+                            {
+                                UpdateFocusRectangle();
+                            }
                             return;
                         }
                     }
@@ -1311,25 +1447,11 @@ namespace FancyWM
 
         private void OnWindowLostFocus(object? sender, WindowFocusChangedEventArgs e)
         {
-            // This delay is needed to handle the case where the previously focused window
-            // loses focus because another window was just created and the OnWindowAdded event
-            // observes the new window as focused.
-            //m_logger.Information("Lost focus on {Handle}={ProcessName}", e.Source.Handle, e.Source.GetCachedProcessName());
-            //await Task.Delay(250);
-
-            //SilenceExceptionIfDead(() =>
-            //{
-            //    using (m_backendLock.EnterScope())
-            //    {
-            //        if (m_backend.HasWindow(e.Source))
-            //        {
-            //            m_logger.Information("Removing focus from {Handle}={ProcessName}", e.Source.Handle, e.Source.GetCachedProcessName());
-            //            m_backend.UnsetFocus(e.Source);
-            //            InvalidateLayout();
-            //        }
-            //    }
-            //});
             m_currentInteraction = UserInteraction.None;
+            if (m_showFocus)
+            {
+                m_dispatcher.BeginInvoke(UpdateFocusRectangle);
+            }
         }
 
         private void OnWindowAdded(object? sender, WindowChangedEventArgs e)
@@ -1651,6 +1773,10 @@ namespace FancyWM
 
             m_logger.Information("Window {Window} move ended", e.Source.DebugString());
             InvalidateLayout();
+            if (m_showFocus)
+            {
+                UpdateFocusRectangle();
+            }
             using (m_ignoreRepositionSetLock.EnterScope())
             {
                 m_ignoreRepositionSet.Remove(e.Source);
@@ -1687,7 +1813,14 @@ namespace FancyWM
                 {
                     // Some other event might have resulted in the movement of the window.
                     // Do not call DetectChanges under the lock, to avoid deadlock.
-                    m_dispatcher.InvokeAsync(() => DetectChanges(e.Source));
+                    m_dispatcher.InvokeAsync(() =>
+                    {
+                        DetectChanges(e.Source);
+                        if (m_showFocus && Equals(m_workspace.FocusedWindow, e.Source))
+                        {
+                            UpdateFocusRectangle();
+                        }
+                    });
                     return;
                 }
             }
@@ -1968,6 +2101,10 @@ namespace FancyWM
                     m_logger.Debug("Window {Window} is also focused, calling OnWindowGotFocus", e.Source.DebugString());
                     // This is to update focus when a maximised window is restored.
                     OnWindowGotFocus(e.Source, new WindowFocusChangedEventArgs(e.Source, true));
+                }
+                else if (m_showFocus)
+                {
+                    UpdateFocusRectangle();
                 }
             }
             catch (InvalidWindowReferenceException)
@@ -2354,6 +2491,7 @@ namespace FancyWM
 
         private void PropagateShowFocusChange()
         {
+            UpdateFocusRectangle();
             InvalidateLayout();
         }
 

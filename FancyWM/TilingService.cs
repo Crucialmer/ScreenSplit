@@ -304,6 +304,7 @@ namespace FancyWM
 
             m_workspace.WindowAdded += OnWindowAdded;
             m_workspace.WindowRemoved += OnWindowRemoved;
+            m_workspace.FocusedWindowChanged += OnWorkspaceFocusedWindowChanged;
 
             PlacementFailed += OnPlacementFailed;
             PendingIntentChanged += OnPendingIntentChanged;
@@ -348,12 +349,17 @@ namespace FancyWM
         {
             m_active = true;
             InvalidateLayout();
+            if (m_showFocus)
+            {
+                UpdateFocusRectangle();
+            }
             m_gui.Show();
         }
 
         public void Stop()
         {
             m_active = false;
+            m_gui.FocusRectangle = null;
             RestoreOriginalLayout();
             m_gui.Hide();
         }
@@ -667,6 +673,7 @@ namespace FancyWM
 
             m_workspace.WindowAdded -= OnWindowAdded;
             m_workspace.WindowRemoved -= OnWindowRemoved;
+            m_workspace.FocusedWindowChanged -= OnWorkspaceFocusedWindowChanged;
 
             m_display.ScalingChanged -= OnDisplayScalingChanged;
 
