@@ -1771,12 +1771,12 @@ namespace FancyWM
                 m_isDraggingSnappedWindow = false;
             }
 
-            m_logger.Information("Window {Window} move ended", e.Source.DebugString());
+            m_currentInteraction = UserInteraction.None;
+            m_isDraggingTitleBar = false;
+            m_isDraggingSnappedWindow = false;
+
+            m_logger.Information("Window {Window} move/resize ended", e.Source.DebugString());
             InvalidateLayout();
-            if (m_showFocus)
-            {
-                UpdateFocusRectangle();
-            }
             using (m_ignoreRepositionSetLock.EnterScope())
             {
                 m_ignoreRepositionSet.Remove(e.Source);
@@ -1785,7 +1785,11 @@ namespace FancyWM
             {
                 m_activeDragOriginalRect.Remove(e.Source);
             }
-            m_currentInteraction = UserInteraction.None;
+
+            if (m_showFocus)
+            {
+                UpdateFocusRectangle();
+            }
         }
 
         private TimeSpan m_lastPlacementFailed = TimeSpan.Zero;
@@ -1816,7 +1820,7 @@ namespace FancyWM
                     m_dispatcher.InvokeAsync(() =>
                     {
                         DetectChanges(e.Source);
-                        if (m_showFocus && Equals(m_workspace.FocusedWindow, e.Source))
+                        if (m_showFocus && m_movingWindow == null && m_currentInteraction == UserInteraction.None && Equals(m_workspace.FocusedWindow, e.Source))
                         {
                             UpdateFocusRectangle();
                         }
@@ -1834,6 +1838,10 @@ namespace FancyWM
                 if (!m_isDraggingSnappedWindow && !m_isDraggingTitleBar && !isSizePreserved)
                 {
                     m_currentInteraction = UserInteraction.Resizing;
+                    if (m_showFocus)
+                    {
+                        m_gui.FocusRectangle = null;
+                    }
                     StopDragTrackingTimer();
                     m_lastPreviewCursor = new Point(-99999, -99999);
                     SetPreviewRectangle(null, null);
@@ -2123,6 +2131,11 @@ namespace FancyWM
                 m_ignoreRepositionSet.Add(e.Source);
             }
             m_movingWindow = e.Source;
+            m_currentInteraction = UserInteraction.Starting;
+            if (m_showFocus)
+            {
+                m_gui.FocusRectangle = null;
+            }
 
             var cursor = m_workspace.CursorLocation;
             Rectangle startPos = GetVisibleWindowRectangle(e.Source);

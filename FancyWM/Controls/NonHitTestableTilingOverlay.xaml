@@ -23,12 +23,21 @@
             Canvas.Left="{Binding FocusRectangle.Left}"
             Canvas.Top="{Binding FocusRectangle.Top}">
             <Rectangle.Style>
-                <Style>
+                <Style TargetType="Rectangle">
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding Path=IsFocusRectangleVisible}" Value="True">
                             <DataTrigger.Setters>
                                 <Setter Property="UIElement.Visibility" Value="Visible" />
                             </DataTrigger.Setters>
+                            <DataTrigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                         From="0.2" To="1.0"
+                                                         Duration="0:0:0.12" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.EnterActions>
                         </DataTrigger>
                         <DataTrigger Binding="{Binding Path=IsFocusRectangleVisible}" Value="False">
                             <DataTrigger.Setters>
