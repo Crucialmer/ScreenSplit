@@ -1049,17 +1049,9 @@ namespace FancyWM
             bool isMouseButtonDown = (PInvoke.GetAsyncKeyState(1) & 0x8000) != 0 || (PInvoke.GetAsyncKeyState(2) & 0x8000) != 0;
             if (!isMouseButtonDown)
             {
-                if (m_movingWindow != null || m_currentInteraction != UserInteraction.None)
-                {
-                    m_movingWindow = null;
-                    m_currentInteraction = UserInteraction.None;
-                    m_isDraggingTitleBar = false;
-                    m_isDraggingSnappedWindow = false;
-                    m_isExternalDrag = false;
-                    StopDragTrackingTimer();
-                    SetPreviewRectangle(null, null);
-                }
-                m_lastActiveSnapZone = ScreenSnapZone.None;
+                // 松开鼠标按键时仅隐藏半透明阴影框，绝不提前销毁 m_movingWindow 或抹除 m_lastActiveSnapZone！
+                // 拖动生命周期的最终完成与上下文释放，严格由 OnWindowPositionChangeEnd (原生拖拽) 或 EndExternalDrag (外部拖拽) 官方负责！
+                SetPreviewRectangle(null, null);
                 return (null, null);
             }
 
@@ -1110,7 +1102,11 @@ namespace FancyWM
                             }
 
                             // 自由区：完全不显示任何阴影框，保证自由拖动纯净无干扰
-                            m_lastActiveSnapZone = ScreenSnapZone.None;
+                            // 保留 400ms 记忆缓冲以抵御物理松手微颤，超时后才清空记忆
+                            if (m_sw.Elapsed - m_lastActiveSnapTime > TimeSpan.FromMilliseconds(400))
+                            {
+                                m_lastActiveSnapZone = ScreenSnapZone.None;
+                            }
                             return (null, null);
                         }
 
@@ -2196,17 +2192,17 @@ namespace FancyWM
             var snapZone = bounds.Contains(testPt) ? GetSnapZone(testPt, wa) : ScreenSnapZone.None;
 
             // ⭐ 核心优化：防微震颤与松手竞态记忆
-            // 若松手瞬间鼠标由于物理按键回弹微颤移出了边缘，但用户在过去 350ms 内正处于预览贴靠区（尤其是 1/4 角落区），
+            // 若松手瞬间鼠标由于物理按键回弹微颤移出了边缘，但用户在过去 400ms 内正处于预览贴靠区（尤其是 1/4 角落区），
             // 严格以用户所见即所得的预览贴靠区为准进行吸附，彻底解决 1/4 分屏松手偶尔失效问题！
             if (snapZone == ScreenSnapZone.None && m_lastActiveSnapZone != ScreenSnapZone.None &&
-                (m_sw.Elapsed - m_lastActiveSnapTime) <= TimeSpan.FromMilliseconds(350))
+                (m_sw.Elapsed - m_lastActiveSnapTime) <= TimeSpan.FromMilliseconds(400))
             {
                 snapZone = m_lastActiveSnapZone;
-                m_logger.Information("[Snap] Using cached active preview snap zone {Zone} (within 350ms release buffer)", snapZone);
+                m_logger.Information("[Snap] Using cached active preview snap zone {Zone} (within 400ms release buffer)", snapZone);
             }
-            // 若松手瞬间滑向了半屏（如 TopHalf），但刚才处于角落 1/4 预览（如 TopLeftQuarter），且时间极其贴近（250ms），优先遵循角落 1/4 分屏
+            // 若松手瞬间滑向了半屏（如 TopHalf），但刚才处于角落 1/4 预览（如 TopLeftQuarter），且时间极其贴近（400ms），优先遵循角落 1/4 分屏
             else if (IsHalfZone(snapZone) && IsQuarterZone(m_lastActiveSnapZone) &&
-                     (m_sw.Elapsed - m_lastActiveSnapTime) <= TimeSpan.FromMilliseconds(250))
+                     (m_sw.Elapsed - m_lastActiveSnapTime) <= TimeSpan.FromMilliseconds(400))
             {
                 snapZone = m_lastActiveSnapZone;
                 m_logger.Information("[Snap] Overriding edge zone with corner quarter zone {Zone} from recent preview", snapZone);
@@ -2416,7 +2412,7 @@ namespace FancyWM
             m_isDraggingTitleBar = false;
             m_isDraggingSnappedWindow = false;
 
-            if (win != null && interaction != UserInteraction.Resizing && (interaction == UserInteraction.Moving || interaction == UserInteraction.Starting))
+            if (win != null && interaction != UserInteraction.Resizing)
             {
                 try
                 {
