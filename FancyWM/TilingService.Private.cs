@@ -878,10 +878,10 @@ namespace FancyWM
         private ScreenSnapZone GetSnapZone(Point pt, Rectangle wa)
         {
             double scale = m_display.Scaling > 0 ? m_display.Scaling : 1.0;
-            // 贴靠最边缘触发阈值：紧贴物理屏幕边框（~4-5 像素，顶点与最边缘灵敏触发，同时保留最大的自由浮动空间）
-            int edgeMargin = Math.Max(5, (int)Math.Round(4.0 * scale));
-            // 最顶点触发阈值：仅在屏幕四个顶角区域（~7-8 像素，顶点精准触发 1/4 分屏）
-            int cornerSize = Math.Max(7, (int)Math.Round(6.0 * scale));
+            // 贴靠最边缘触发阈值：紧贴物理屏幕最外层边框（~2 像素，最大化自由浮动空间，绝不向屏幕内延伸）
+            int edgeMargin = Math.Max(2, (int)Math.Round(1.5 * scale));
+            // 最顶点触发阈值：仅在屏幕四个顶角极小区域（~3 像素，顶点精准触发 1/4 分屏）
+            int cornerSize = Math.Max(3, (int)Math.Round(2.5 * scale));
 
             // 1. Four Corners (1/4 Layout) - Must be within corner threshold in both X and Y
             if (pt.X <= wa.Left + cornerSize && pt.Y <= wa.Top + cornerSize)
@@ -978,18 +978,23 @@ namespace FancyWM
         {
             if (pos.Width <= 0 || pos.Height <= 0) return false;
             int margin = Math.Max(8, (int)Math.Round(8 * scale));
-            int headerH = Math.Max(40, (int)Math.Round(45 * scale));
+            int topMargin = Math.Max(6, (int)Math.Round(6 * scale));
 
             // Bottom border or bottom corners
             if (Math.Abs(cursor.Y - pos.Bottom) <= margin)
                 return true;
 
-            // Left or Right border strictly below the titlebar/menubar
-            if (cursor.Y > pos.Top + headerH)
-            {
-                if (Math.Abs(cursor.X - pos.Left) <= margin || Math.Abs(cursor.X - pos.Right) <= margin)
-                    return true;
-            }
+            // Top border or top corners
+            if (Math.Abs(cursor.Y - pos.Top) <= topMargin)
+                return true;
+
+            // Left border or left corners
+            if (Math.Abs(cursor.X - pos.Left) <= margin)
+                return true;
+
+            // Right border or right corners
+            if (Math.Abs(cursor.X - pos.Right) <= margin)
+                return true;
 
             return false;
         }
@@ -998,23 +1003,41 @@ namespace FancyWM
 
         private (Rectangle? Rect, string? Title) GetPreviewInfo(Point pt)
         {
+            // 绝对核心前提：必须正在物理按住鼠标按键！若未按住鼠标按键，绝对不属于拖动窗口，绝不显示分屏阴影！
+            bool isMouseButtonDown = (PInvoke.GetAsyncKeyState(1) & 0x8000) != 0 || (PInvoke.GetAsyncKeyState(2) & 0x8000) != 0;
+            if (!isMouseButtonDown)
+            {
+                if (m_movingWindow != null || m_currentInteraction != UserInteraction.None)
+                {
+                    m_movingWindow = null;
+                    m_currentInteraction = UserInteraction.None;
+                    m_isDraggingTitleBar = false;
+                    m_isDraggingSnappedWindow = false;
+                    m_isExternalDrag = false;
+                    StopDragTrackingTimer();
+                    SetPreviewRectangle(null, null);
+                }
+                return (null, null);
+            }
+
             // 严格切割：窗口放大/缩小（Resizing）时绝对不触发分屏预览
             if (m_currentInteraction == UserInteraction.Resizing)
             {
                 return (null, null);
             }
 
-            if (m_currentInteraction == UserInteraction.Moving || m_currentInteraction == UserInteraction.Starting || m_movingWindow != null || m_movingPanelNode != null)
+            // 必须正在进行窗口移动，且当前有被移动窗口；或者正在拖动 panel
+            if ((m_currentInteraction == UserInteraction.Moving && m_movingWindow != null) || m_movingPanelNode != null)
             {
                 try
                 {
                     var bounds = m_display.Bounds;
                     var testPt = pt;
-                    // 若光标在屏幕边界 20 像素范围内，自动对齐到边缘，确保鼠标顶边/贴边时绝无遗漏
-                    if (pt.X >= bounds.Left - 20 && pt.X <= bounds.Right + 20 && pt.Y >= bounds.Top - 20 && pt.Y <= bounds.Bottom + 20)
-                    {
-                        testPt = new Point(Math.Clamp(pt.X, bounds.Left, bounds.Right), Math.Clamp(pt.Y, bounds.Top, bounds.Bottom));
-                    }
+                    // 仅当光标在屏幕边界外微小偏移时，校准回屏幕边界内
+                    if (pt.X < bounds.Left) testPt = new Point(bounds.Left, testPt.Y);
+                    if (pt.X > bounds.Right) testPt = new Point(bounds.Right, testPt.Y);
+                    if (pt.Y < bounds.Top) testPt = new Point(testPt.X, bounds.Top);
+                    if (pt.Y > bounds.Bottom) testPt = new Point(testPt.X, bounds.Bottom);
 
                     if (bounds.Contains(testPt))
                     {
@@ -1523,7 +1546,24 @@ namespace FancyWM
 
         private void OnCursorLocationChanged(object? sender, CursorLocationChangedEventArgs e)
         {
-            if (m_currentInteraction != UserInteraction.Resizing && (m_currentInteraction == UserInteraction.Moving || m_movingWindow != null))
+            // 鼠标未按住时绝对不触发分屏预览，并清理残留状态
+            bool isMouseButtonDown = (PInvoke.GetAsyncKeyState(1) & 0x8000) != 0 || (PInvoke.GetAsyncKeyState(2) & 0x8000) != 0;
+            if (!isMouseButtonDown)
+            {
+                if (m_movingWindow != null || m_currentInteraction != UserInteraction.None)
+                {
+                    m_movingWindow = null;
+                    m_currentInteraction = UserInteraction.None;
+                    m_isDraggingTitleBar = false;
+                    m_isDraggingSnappedWindow = false;
+                    m_isExternalDrag = false;
+                    StopDragTrackingTimer();
+                    SetPreviewRectangle(null, null);
+                }
+                return;
+            }
+
+            if (m_currentInteraction == UserInteraction.Moving && m_movingWindow != null)
             {
                 UpdateDragPreview(e.NewLocation);
             }
@@ -2097,10 +2137,10 @@ namespace FancyWM
             var pt = m_workspace.CursorLocation;
             var bounds = m_display.Bounds;
             var testPt = pt;
-            if (pt.X >= bounds.Left - 20 && pt.X <= bounds.Right + 20 && pt.Y >= bounds.Top - 20 && pt.Y <= bounds.Bottom + 20)
-            {
-                testPt = new Point(Math.Clamp(pt.X, bounds.Left, bounds.Right), Math.Clamp(pt.Y, bounds.Top, bounds.Bottom));
-            }
+            if (pt.X < bounds.Left) testPt = new Point(bounds.Left, testPt.Y);
+            if (pt.X > bounds.Right) testPt = new Point(bounds.Right, testPt.Y);
+            if (pt.Y < bounds.Top) testPt = new Point(testPt.X, bounds.Top);
+            if (pt.Y > bounds.Bottom) testPt = new Point(testPt.X, bounds.Bottom);
             var wa = m_display.WorkArea;
             var snapZone = bounds.Contains(testPt) ? GetSnapZone(testPt, wa) : ScreenSnapZone.None;
 
@@ -2480,9 +2520,9 @@ namespace FancyWM
             int dW = rawStartRect.Width > 0 ? Math.Abs(e.NewPosition.Width - rawStartRect.Width) : 0;
             int dH = rawStartRect.Height > 0 ? Math.Abs(e.NewPosition.Height - rawStartRect.Height) : 0;
 
-            // 仅当用户既不是拖动贴靠窗口还原、又不是拖动标题栏/菜单栏、也不是外部拖动时，窗口尺寸发生显著形变（大于 16 像素）才视为用户正在手动缩放边框（放大/缩小）
-            bool isResizeCandidate = !m_isDraggingSnappedWindow && !m_isDraggingTitleBar && !m_isExternalDrag;
-            if (isResizeCandidate && (dW > 16 || dH > 16))
+            // 尺寸形变判定：只要不是贴靠窗口拖拽还原、也不是外部拖动，一旦窗口尺寸发生形变（大于 8 像素），确认为用户正在手动缩放边框（放大/缩小）
+            bool isSizeChanged = !m_isDraggingSnappedWindow && !m_isExternalDrag && (dW > 8 || dH > 8);
+            if (isSizeChanged)
             {
                 m_currentInteraction = UserInteraction.Resizing;
                 m_isDraggingTitleBar = false;
@@ -2875,14 +2915,14 @@ namespace FancyWM
                 m_currentDragTargetSize = new WinMan.Point(startPos.Width, startPos.Height);
             }
 
-            int topHeaderHeight = Math.Max(40, (int)Math.Round(50 * scale));
-            int topResizeMargin = Math.Max(3, (int)Math.Round(3.5 * scale));
-            bool isTopBorderClick = Math.Abs(cursor.Y - rawStartPos.Top) <= topResizeMargin;
+            int borderMargin = Math.Max(8, (int)Math.Round(8 * scale));
+            int topHeaderHeight = Math.Max(40, (int)Math.Round(45 * scale));
 
-            bool inTitleBarArea = !isTopBorderClick &&
-                                  cursor.Y > rawStartPos.Top + topResizeMargin &&
+            // 严格位于窗口顶部内侧（距离上、左、右各边框均保留安全间距，完全排除四周边框缩放区域）
+            bool inTitleBarArea = cursor.Y > rawStartPos.Top + borderMargin &&
                                   cursor.Y <= rawStartPos.Top + topHeaderHeight &&
-                                  cursor.X >= rawStartPos.Left - 10 && cursor.X <= rawStartPos.Right + 10;
+                                  cursor.X > rawStartPos.Left + borderMargin &&
+                                  cursor.X < rawStartPos.Right - borderMargin;
             m_isDraggingTitleBar = inTitleBarArea;
             m_currentInteraction = UserInteraction.Moving;
 

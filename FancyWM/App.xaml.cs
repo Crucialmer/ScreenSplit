@@ -79,7 +79,7 @@ namespace FancyWM
                 {
                     var path = Environment.ProcessPath ?? Assembly.GetEntryAssembly()?.Location;
                     var versionInfo = !string.IsNullOrEmpty(path) ? FileVersionInfo.GetVersionInfo(path) : null;
-                    return versionInfo?.FileVersion ?? "1.0.23.0";
+                    return versionInfo?.FileVersion ?? "1.0.24.0";
                 }
             }
         }
