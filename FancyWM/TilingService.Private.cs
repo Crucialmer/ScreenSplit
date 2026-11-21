@@ -878,10 +878,10 @@ namespace FancyWM
         private ScreenSnapZone GetSnapZone(Point pt, Rectangle wa)
         {
             double scale = m_display.Scaling > 0 ? m_display.Scaling : 1.0;
-            // 贴靠最边缘触发阈值：紧贴物理屏幕边框（~2-3 像素，不向屏幕内延伸，保留最大的自由浮动空间）
-            int edgeMargin = Math.Max(3, (int)Math.Round(2.5 * scale));
-            // 最顶点触发阈值：仅在屏幕四个顶角极小区域（~4-5 像素，顶点精准触发 1/4 分屏）
-            int cornerSize = Math.Max(4, (int)Math.Round(3.5 * scale));
+            // 贴靠最边缘触发阈值：紧贴物理屏幕边框（~4-5 像素，顶点与最边缘灵敏触发，同时保留最大的自由浮动空间）
+            int edgeMargin = Math.Max(5, (int)Math.Round(4.0 * scale));
+            // 最顶点触发阈值：仅在屏幕四个顶角区域（~7-8 像素，顶点精准触发 1/4 分屏）
+            int cornerSize = Math.Max(7, (int)Math.Round(6.0 * scale));
 
             // 1. Four Corners (1/4 Layout) - Must be within corner threshold in both X and Y
             if (pt.X <= wa.Left + cornerSize && pt.Y <= wa.Top + cornerSize)
@@ -978,7 +978,7 @@ namespace FancyWM
         {
             if (pos.Width <= 0 || pos.Height <= 0) return false;
             int margin = Math.Max(8, (int)Math.Round(8 * scale));
-            int headerH = Math.Max(40, (int)Math.Round(40 * scale));
+            int headerH = Math.Max(40, (int)Math.Round(45 * scale));
 
             // Bottom border or bottom corners
             if (Math.Abs(cursor.Y - pos.Bottom) <= margin)
@@ -1004,16 +1004,24 @@ namespace FancyWM
                 return (null, null);
             }
 
-            if (m_currentInteraction == UserInteraction.Moving || m_movingPanelNode != null)
+            if (m_currentInteraction == UserInteraction.Moving || m_currentInteraction == UserInteraction.Starting || m_movingWindow != null || m_movingPanelNode != null)
             {
                 try
                 {
-                    if (m_display.Bounds.Contains(pt))
+                    var bounds = m_display.Bounds;
+                    var testPt = pt;
+                    // 若光标在屏幕边界 20 像素范围内，自动对齐到边缘，确保鼠标顶边/贴边时绝无遗漏
+                    if (pt.X >= bounds.Left - 20 && pt.X <= bounds.Right + 20 && pt.Y >= bounds.Top - 20 && pt.Y <= bounds.Bottom + 20)
+                    {
+                        testPt = new Point(Math.Clamp(pt.X, bounds.Left, bounds.Right), Math.Clamp(pt.Y, bounds.Top, bounds.Bottom));
+                    }
+
+                    if (bounds.Contains(testPt))
                     {
                         var wa = m_display.WorkArea;
                         if (m_movingPanelNode == null)
                         {
-                            var snapZone = GetSnapZone(pt, wa);
+                            var snapZone = GetSnapZone(testPt, wa);
                             if (snapZone != ScreenSnapZone.None)
                             {
                                 string snapTitle = snapZone switch
@@ -1087,11 +1095,7 @@ namespace FancyWM
                     m_currentInteraction = UserInteraction.None;
                     m_lastPreviewCursor = new Point(-99999, -99999);
                     SetPreviewRectangle(null, null);
-                    if (interaction == UserInteraction.Moving)
-                    {
-                        DoWindowMove(win);
-                    }
-                    else if (interaction == UserInteraction.Resizing)
+                    if (interaction == UserInteraction.Resizing)
                     {
                         var finalPos = GetVisibleWindowRectangle(win);
                         if (finalPos.Width <= 0 || finalPos.Height <= 0) finalPos = win.Position;
@@ -1104,6 +1108,10 @@ namespace FancyWM
                             }
                             RecordFloatingMemory(win, finalPos);
                         }
+                    }
+                    else
+                    {
+                        DoWindowMove(win);
                     }
                 }
                 return;
@@ -1515,7 +1523,7 @@ namespace FancyWM
 
         private void OnCursorLocationChanged(object? sender, CursorLocationChangedEventArgs e)
         {
-            if (m_currentInteraction == UserInteraction.Moving)
+            if (m_currentInteraction != UserInteraction.Resizing && (m_currentInteraction == UserInteraction.Moving || m_movingWindow != null))
             {
                 UpdateDragPreview(e.NewLocation);
             }
@@ -2047,6 +2055,7 @@ namespace FancyWM
             {
                 m_preSnapRectangles.Remove(e.Source);
                 m_activeDragOriginalRect.Remove(e.Source);
+                m_activeDragInitialRawRect.Remove(e.Source);
             }
             using (m_lastFloatingRectanglesLock.EnterScope())
             {
@@ -2086,8 +2095,14 @@ namespace FancyWM
         private void DoWindowMove(IWindow window)
         {
             var pt = m_workspace.CursorLocation;
+            var bounds = m_display.Bounds;
+            var testPt = pt;
+            if (pt.X >= bounds.Left - 20 && pt.X <= bounds.Right + 20 && pt.Y >= bounds.Top - 20 && pt.Y <= bounds.Bottom + 20)
+            {
+                testPt = new Point(Math.Clamp(pt.X, bounds.Left, bounds.Right), Math.Clamp(pt.Y, bounds.Top, bounds.Bottom));
+            }
             var wa = m_display.WorkArea;
-            var snapZone = m_display.Bounds.Contains(pt) ? GetSnapZone(pt, wa) : ScreenSnapZone.None;
+            var snapZone = bounds.Contains(testPt) ? GetSnapZone(testPt, wa) : ScreenSnapZone.None;
 
             if (snapZone != ScreenSnapZone.None)
             {
@@ -2110,6 +2125,7 @@ namespace FancyWM
                             }
                             RecordFloatingMemory(window, origDragRect);
                             m_activeDragOriginalRect.Remove(window);
+                            m_activeDragInitialRawRect.Remove(window);
                         }
                         else if (!m_preSnapRectangles.ContainsKey(window) ||
                                  IsWindowSnappedGeometry(m_preSnapRectangles[window], wa))
@@ -2158,6 +2174,7 @@ namespace FancyWM
                     m_preSnapRectangles.Remove(window);
                 }
                 m_activeDragOriginalRect.Remove(window);
+                m_activeDragInitialRawRect.Remove(window);
             }
 
             using (m_snappedWindowsLock.EnterScope())
@@ -2288,7 +2305,7 @@ namespace FancyWM
             m_isDraggingTitleBar = false;
             m_isDraggingSnappedWindow = false;
 
-            if (win != null && interaction == UserInteraction.Moving)
+            if (win != null && interaction != UserInteraction.Resizing && (interaction == UserInteraction.Moving || interaction == UserInteraction.Starting))
             {
                 try
                 {
@@ -2334,6 +2351,7 @@ namespace FancyWM
             using (m_preSnapRectanglesLock.EnterScope())
             {
                 m_activeDragOriginalRect.Remove(e.Source);
+                m_activeDragInitialRawRect.Remove(e.Source);
             }
 
             if (m_showFocus)
@@ -2453,17 +2471,18 @@ namespace FancyWM
                 return;
             }
 
-            Rectangle startRect = default;
+            Rectangle rawStartRect = default;
             using (m_preSnapRectanglesLock.EnterScope())
             {
-                m_activeDragOriginalRect.TryGetValue(e.Source, out startRect);
+                m_activeDragInitialRawRect.TryGetValue(e.Source, out rawStartRect);
             }
 
-            int dW = startRect.Width > 0 ? Math.Abs(e.NewPosition.Width - startRect.Width) : 0;
-            int dH = startRect.Height > 0 ? Math.Abs(e.NewPosition.Height - startRect.Height) : 0;
+            int dW = rawStartRect.Width > 0 ? Math.Abs(e.NewPosition.Width - rawStartRect.Width) : 0;
+            int dH = rawStartRect.Height > 0 ? Math.Abs(e.NewPosition.Height - rawStartRect.Height) : 0;
 
-            // 如果窗口尺寸相对于拖动开始发生显著形变（大于 12 像素），且不是贴靠窗口拖拽还原，则确认为用户正在手动缩放边框（放大/缩小）
-            if (!m_isDraggingSnappedWindow && (dW > 12 || dH > 12))
+            // 仅当用户既不是拖动贴靠窗口还原、又不是拖动标题栏/菜单栏、也不是外部拖动时，窗口尺寸发生显著形变（大于 16 像素）才视为用户正在手动缩放边框（放大/缩小）
+            bool isResizeCandidate = !m_isDraggingSnappedWindow && !m_isDraggingTitleBar && !m_isExternalDrag;
+            if (isResizeCandidate && (dW > 16 || dH > 16))
             {
                 m_currentInteraction = UserInteraction.Resizing;
                 m_isDraggingTitleBar = false;
@@ -2474,6 +2493,7 @@ namespace FancyWM
                 {
                     m_preSnapRectangles.Remove(e.Source);
                     m_activeDragOriginalRect.Remove(e.Source);
+                    m_activeDragInitialRawRect.Remove(e.Source);
                 }
                 using (m_snappedWindowsLock.EnterScope())
                 {
@@ -2484,7 +2504,7 @@ namespace FancyWM
                 return;
             }
 
-            if (m_currentInteraction == UserInteraction.Starting)
+            if (m_currentInteraction != UserInteraction.Resizing)
             {
                 m_currentInteraction = UserInteraction.Moving;
             }
@@ -2759,7 +2779,7 @@ namespace FancyWM
                 m_ignoreRepositionSet.Add(e.Source);
             }
             m_movingWindow = e.Source;
-            m_currentInteraction = UserInteraction.Starting;
+            m_currentInteraction = UserInteraction.Moving;
 
             var cursor = m_workspace.CursorLocation;
             Rectangle rawStartPos = e.NewPosition.Width > 0 ? e.NewPosition : e.Source.Position;
@@ -2770,9 +2790,11 @@ namespace FancyWM
             }
 
             // 始终记录初始 raw 物理位置供尺寸形变比对（与 e.NewPosition 处于完全相同的坐标系，绝无 DWM 边框差值！）
+            // 同时记录 startPos 供贴靠窗口还原记忆
             using (m_preSnapRectanglesLock.EnterScope())
             {
-                m_activeDragOriginalRect[e.Source] = rawStartPos;
+                m_activeDragInitialRawRect[e.Source] = rawStartPos;
+                m_activeDragOriginalRect[e.Source] = startPos;
             }
 
             double scale = m_display.Scaling > 0 ? m_display.Scaling : 1.0;
@@ -2839,10 +2861,6 @@ namespace FancyWM
             else
             {
                 m_isDraggingSnappedWindow = false;
-                using (m_preSnapRectanglesLock.EnterScope())
-                {
-                    m_activeDragOriginalRect[e.Source] = startPos;
-                }
                 using (m_lastFloatingRectanglesLock.EnterScope())
                 {
                     if (IsValidFloatingRect(startPos, wa))
@@ -2857,11 +2875,16 @@ namespace FancyWM
                 m_currentDragTargetSize = new WinMan.Point(startPos.Width, startPos.Height);
             }
 
-            int topHeaderHeight = Math.Max(40, (int)(startPos.Height * 0.25));
-            bool inTitleBarArea = cursor.Y >= startPos.Top - 15 && cursor.Y <= startPos.Top + topHeaderHeight &&
-                                  cursor.X >= startPos.Left - 10 && cursor.X <= startPos.Right + 10;
+            int topHeaderHeight = Math.Max(40, (int)Math.Round(50 * scale));
+            int topResizeMargin = Math.Max(3, (int)Math.Round(3.5 * scale));
+            bool isTopBorderClick = Math.Abs(cursor.Y - rawStartPos.Top) <= topResizeMargin;
+
+            bool inTitleBarArea = !isTopBorderClick &&
+                                  cursor.Y > rawStartPos.Top + topResizeMargin &&
+                                  cursor.Y <= rawStartPos.Top + topHeaderHeight &&
+                                  cursor.X >= rawStartPos.Left - 10 && cursor.X <= rawStartPos.Right + 10;
             m_isDraggingTitleBar = inTitleBarArea;
-            m_currentInteraction = UserInteraction.Starting;
+            m_currentInteraction = UserInteraction.Moving;
 
             StartDragTrackingTimer();
             UpdateDragPreview(cursor);

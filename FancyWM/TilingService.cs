@@ -175,6 +175,7 @@ namespace FancyWM
 
         private readonly Dictionary<IWindow, Rectangle> m_preSnapRectangles = [];
         private readonly Dictionary<IWindow, Rectangle> m_activeDragOriginalRect = [];
+        private readonly Dictionary<IWindow, Rectangle> m_activeDragInitialRawRect = [];
         private readonly Utilities.DebugLock m_preSnapRectanglesLock = new(LockThreshold);
         private readonly HashSet<IWindow> m_snappedWindows = [];
         private readonly Utilities.DebugLock m_snappedWindowsLock = new(LockThreshold);
