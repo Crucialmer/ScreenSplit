@@ -29,9 +29,9 @@ using System.Runtime.InteropServices;
 //      Build Number
 //      Revision
 //
-[assembly: AssemblyVersion("1.0.25.0")]
-[assembly: AssemblyFileVersion("1.0.25.0")]
-[assembly: AssemblyInformationalVersion("1.0.25")]
+[assembly: AssemblyVersion("1.0.26.0")]
+[assembly: AssemblyFileVersion("1.0.26.0")]
+[assembly: AssemblyInformationalVersion("1.0.26")]
 
 // Expose internals to tests
 [assembly: InternalsVisibleTo("FancyWM.Tests")]

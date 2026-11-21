@@ -878,19 +878,19 @@ namespace FancyWM
         private ScreenSnapZone GetSnapZone(Point pt, Rectangle wa)
         {
             double scale = m_display.Scaling > 0 ? m_display.Scaling : 1.0;
-            // 贴靠最边缘触发阈值：紧贴物理屏幕最外层边框（~2 像素，最大化自由浮动空间，绝不向屏幕内延伸）
-            int edgeMargin = Math.Max(2, (int)Math.Round(2.0 * scale));
-            // 顶角沿边扩展范围：光标推至顶角区域时沿屏幕边缘的识别范围（~36-45 像素，符合鼠标光标自身尺寸，保证 1/4 分屏 100% 灵敏触发）
-            int cornerExtent = Math.Max(36, (int)Math.Round(42.0 * scale));
-            // 顶点微型对角范围：斜向推入顶角顶点时的容差（~10-12 像素）
-            int cornerVertex = Math.Max(10, (int)Math.Round(12.0 * scale));
+            // 贴靠最边缘触发阈值：紧贴物理屏幕最外层边框（~2-3 像素，最大化自由浮动空间，绝不向屏幕内延伸）
+            int edgeMargin = Math.Max(2, (int)Math.Round(3.0 * scale));
+            // 顶角沿边扩展范围：光标沿屏幕边缘滑向顶角时的识别范围（~100-140 像素，占屏幕边缘约 10-12%，完美区分角落与中心半屏）
+            int cornerExtent = Math.Max(100, (int)Math.Round(120.0 * scale));
+            // 顶点对角直入范围：斜向推入顶角顶点时的容差（~32-36 像素，完美匹配鼠标指针自身尺寸）
+            int cornerVertex = Math.Max(28, (int)Math.Round(36.0 * scale));
 
             bool nearLeft = pt.X <= wa.Left + edgeMargin;
             bool nearRight = pt.X >= wa.Right - edgeMargin;
             bool nearTop = pt.Y <= wa.Top + edgeMargin;
             bool nearBottom = pt.Y >= wa.Bottom - edgeMargin;
 
-            // 1. Four Corners (1/4 Layout) - 既支持对角精准推入顶点，也支持沿边滑动进顶角，视觉与手感零盲区
+            // 1. Four Corners (1/4 Layout) - 既支持对角精准推入顶点，也支持沿边滑动进顶角，视觉与手感零死区
             // Top-Left Quarter
             if ((pt.X <= wa.Left + cornerVertex && pt.Y <= wa.Top + cornerVertex) ||
                 (nearTop && pt.X <= wa.Left + cornerExtent) ||
@@ -1000,15 +1000,10 @@ namespace FancyWM
         {
             if (pos.Width <= 0 || pos.Height <= 0) return false;
             int margin = Math.Max(8, (int)Math.Round(8 * scale));
-            int topMargin = Math.Max(5, (int)Math.Round(5 * scale));
             int headerH = Math.Max(60, (int)Math.Round(75 * scale));
 
-            // Bottom border or bottom corners
+            // Bottom border or bottom corners (definitely resizing)
             if (Math.Abs(cursor.Y - pos.Bottom) <= margin)
-                return true;
-
-            // Top border (only the top 5px edge)
-            if (Math.Abs(cursor.Y - pos.Top) <= topMargin)
                 return true;
 
             // Left or Right border strictly below the header area
@@ -1018,16 +1013,20 @@ namespace FancyWM
                     return true;
             }
 
-            // In header area (titlebar + menubar): only extreme outer 4px is considered border resize
-            int sideMarginInHeader = Math.Max(4, (int)Math.Round(4 * scale));
-            if (cursor.Y <= pos.Top + headerH)
-            {
-                if (Math.Abs(cursor.X - pos.Left) <= sideMarginInHeader || Math.Abs(cursor.X - pos.Right) <= sideMarginInHeader)
-                    return true;
-            }
-
+            // Note: Header area (title bar, menu bar, tabs) is NEVER intercepted as border resize at click start.
+            // Actual border resizing will immediately change window dimensions (dW > 8 or dH > 8) during drag,
+            // which is dynamically detected and handled in OnWindowPositionChanged with 100% precision!
             return false;
         }
+
+        private static bool IsHalfZone(ScreenSnapZone zone) =>
+            zone is ScreenSnapZone.LeftHalf or ScreenSnapZone.RightHalf or ScreenSnapZone.TopHalf or ScreenSnapZone.BottomHalf;
+
+        private static bool IsQuarterZone(ScreenSnapZone zone) =>
+            zone is ScreenSnapZone.TopLeftQuarter or ScreenSnapZone.TopRightQuarter or ScreenSnapZone.BottomLeftQuarter or ScreenSnapZone.BottomRightQuarter;
+
+        private ScreenSnapZone m_lastActiveSnapZone = ScreenSnapZone.None;
+        private TimeSpan m_lastActiveSnapTime = TimeSpan.Zero;
 
         private (Rectangle? Rect, string? Title) GetPreviewInfo() => GetPreviewInfo(m_workspace.CursorLocation);
 
@@ -1047,12 +1046,14 @@ namespace FancyWM
                     StopDragTrackingTimer();
                     SetPreviewRectangle(null, null);
                 }
+                m_lastActiveSnapZone = ScreenSnapZone.None;
                 return (null, null);
             }
 
             // 严格切割：窗口放大/缩小（Resizing）时绝对不触发分屏预览
             if (m_currentInteraction == UserInteraction.Resizing)
             {
+                m_lastActiveSnapZone = ScreenSnapZone.None;
                 return (null, null);
             }
 
@@ -1077,6 +1078,9 @@ namespace FancyWM
                             var snapZone = GetSnapZone(testPt, wa);
                             if (snapZone != ScreenSnapZone.None)
                             {
+                                m_lastActiveSnapZone = snapZone;
+                                m_lastActiveSnapTime = m_sw.Elapsed;
+
                                 string snapTitle = snapZone switch
                                 {
                                     ScreenSnapZone.LeftHalf => "停靠左半屏",
@@ -1093,6 +1097,7 @@ namespace FancyWM
                             }
 
                             // 自由区：完全不显示任何阴影框，保证自由拖动纯净无干扰
+                            m_lastActiveSnapZone = ScreenSnapZone.None;
                             return (null, null);
                         }
 
@@ -2174,6 +2179,25 @@ namespace FancyWM
             var wa = m_display.WorkArea;
             var snapZone = bounds.Contains(testPt) ? GetSnapZone(testPt, wa) : ScreenSnapZone.None;
 
+            // ⭐ 核心优化：防微震颤与松手竞态记忆
+            // 若松手瞬间鼠标由于物理按键回弹微颤移出了边缘，但用户在过去 350ms 内正处于预览贴靠区（尤其是 1/4 角落区），
+            // 严格以用户所见即所得的预览贴靠区为准进行吸附，彻底解决 1/4 分屏松手偶尔失效问题！
+            if (snapZone == ScreenSnapZone.None && m_lastActiveSnapZone != ScreenSnapZone.None &&
+                (m_sw.Elapsed - m_lastActiveSnapTime) <= TimeSpan.FromMilliseconds(350))
+            {
+                snapZone = m_lastActiveSnapZone;
+                m_logger.Information("[Snap] Using cached active preview snap zone {Zone} (within 350ms release buffer)", snapZone);
+            }
+            // 若松手瞬间滑向了半屏（如 TopHalf），但刚才处于角落 1/4 预览（如 TopLeftQuarter），且时间极其贴近（250ms），优先遵循角落 1/4 分屏
+            else if (IsHalfZone(snapZone) && IsQuarterZone(m_lastActiveSnapZone) &&
+                     (m_sw.Elapsed - m_lastActiveSnapTime) <= TimeSpan.FromMilliseconds(250))
+            {
+                snapZone = m_lastActiveSnapZone;
+                m_logger.Information("[Snap] Overriding edge zone with corner quarter zone {Zone} from recent preview", snapZone);
+            }
+
+            m_lastActiveSnapZone = ScreenSnapZone.None;
+
             if (snapZone != ScreenSnapZone.None)
             {
                 var targetRect = GetSnapRectangle(snapZone, wa);
@@ -2911,6 +2935,14 @@ namespace FancyWM
                 {
                     if (m_snappedWindows.Contains(e.Source) && (startPos.Width >= wa.Width * 0.45 || startPos.Height >= wa.Height * 0.45))
                         wasSnapped = true;
+                }
+            }
+            if (!wasSnapped)
+            {
+                if (e.Source.State == WindowState.Maximized ||
+                    (startPos.Width >= wa.Width - 20 && startPos.Height >= wa.Height - 20))
+                {
+                    wasSnapped = true;
                 }
             }
 
