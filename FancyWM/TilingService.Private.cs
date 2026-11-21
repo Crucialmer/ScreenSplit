@@ -974,65 +974,21 @@ namespace FancyWM
             }
         }
 
-        private static int GetWindowHitTest(IntPtr hwnd, WinMan.Point pt)
+        private static bool IsResizeBorderClick(Rectangle pos, WinMan.Point cursor, double scale)
         {
-            if (hwnd == IntPtr.Zero) return 0;
-            try
-            {
-                unsafe
-                {
-                    nuint result = 0;
-                    nint lp = (nint)(((long)pt.Y << 16) | ((long)pt.X & 0xFFFF));
-                    var ret = PInvoke.SendMessageTimeout(
-                        new(hwnd),
-                        0x0084u, // WM_NCHITTEST
-                        new(0),
-                        (LPARAM)lp,
-                        SendMessageTimeout_fuFlags.SMTO_ABORTIFHUNG | SendMessageTimeout_fuFlags.SMTO_NORMAL,
-                        35,
-                        &result);
-                    if (ret != 0)
-                    {
-                        return (int)(long)result;
-                    }
-                }
-            }
-            catch { }
-            return 0;
-        }
+            if (pos.Width <= 0 || pos.Height <= 0) return false;
+            int margin = Math.Max(8, (int)Math.Round(8 * scale));
+            int headerH = Math.Max(40, (int)Math.Round(40 * scale));
 
-        private static bool IsResizeHitTest(int hitTest)
-        {
-            // HTGROWBOX/HTSIZE (4), HTLEFT (10), HTRIGHT (11), HTTOP (12), HTTOPLEFT (13),
-            // HTTOPRIGHT (14), HTBOTTOM (15), HTBOTTOMLEFT (16), HTBOTTOMRIGHT (17), HTBORDER (18)
-            return hitTest is 4 or >= 10 and <= 18;
-        }
-
-        private bool IsGeometricResizeBorder(Rectangle startPos, WinMan.Point cursor)
-        {
-            if (startPos.Width <= 0 || startPos.Height <= 0) return false;
-            double scale = m_display.Scaling > 0 ? m_display.Scaling : 1.0;
-            int borderMargin = Math.Max(8, (int)Math.Round(8 * scale));
-
-            // Must be near the window perimeter
-            if (cursor.X < startPos.Left - borderMargin || cursor.X > startPos.Right + borderMargin ||
-                cursor.Y < startPos.Top - borderMargin || cursor.Y > startPos.Bottom + borderMargin)
-            {
-                return false;
-            }
-
-            // Left, Right, Bottom borders
-            if (Math.Abs(cursor.X - startPos.Left) <= borderMargin ||
-                Math.Abs(cursor.X - startPos.Right) <= borderMargin ||
-                Math.Abs(cursor.Y - startPos.Bottom) <= borderMargin)
-            {
+            // Bottom border or bottom corners
+            if (Math.Abs(cursor.Y - pos.Bottom) <= margin)
                 return true;
-            }
 
-            // Top border (top 4-5px sizing grip)
-            if (cursor.Y <= startPos.Top + Math.Max(4, (int)Math.Round(4 * scale)))
+            // Left or Right border strictly below the titlebar/menubar
+            if (cursor.Y > pos.Top + headerH)
             {
-                return true;
+                if (Math.Abs(cursor.X - pos.Left) <= margin || Math.Abs(cursor.X - pos.Right) <= margin)
+                    return true;
             }
 
             return false;
@@ -2506,8 +2462,8 @@ namespace FancyWM
             int dW = startRect.Width > 0 ? Math.Abs(e.NewPosition.Width - startRect.Width) : 0;
             int dH = startRect.Height > 0 ? Math.Abs(e.NewPosition.Height - startRect.Height) : 0;
 
-            // 如果窗口尺寸相对于拖动开始发生变化（大于 6 像素），且不是贴靠窗口拖拽还原，则确认为用户手动缩放界面（放大/缩小）
-            if (!m_isDraggingSnappedWindow && (dW > 6 || dH > 6))
+            // 如果窗口尺寸相对于拖动开始发生显著形变（大于 12 像素），且不是贴靠窗口拖拽还原，则确认为用户正在手动缩放边框（放大/缩小）
+            if (!m_isDraggingSnappedWindow && (dW > 12 || dH > 12))
             {
                 m_currentInteraction = UserInteraction.Resizing;
                 m_isDraggingTitleBar = false;
@@ -2806,36 +2762,33 @@ namespace FancyWM
             m_currentInteraction = UserInteraction.Starting;
 
             var cursor = m_workspace.CursorLocation;
+            Rectangle rawStartPos = e.NewPosition.Width > 0 ? e.NewPosition : e.Source.Position;
             Rectangle startPos = GetVisibleWindowRectangle(e.Source);
             if (startPos.Width <= 0 || startPos.Height <= 0)
             {
-                startPos = e.OldPosition.Width > 0 ? e.OldPosition : e.Source.Position;
+                startPos = rawStartPos;
             }
 
-            // ⭐ 核心优化：Win32 Hit-Test 与几何边缘检测，彻底将“窗口放大缩小”与“分屏功能”切割开！
-            int hitTest = GetWindowHitTest(e.Source.Handle, cursor);
-            bool isResize = IsResizeHitTest(hitTest);
-            if (!isResize && hitTest == 0)
-            {
-                isResize = IsGeometricResizeBorder(startPos, cursor);
-            }
-
-            // 始终记录初始位置以供多层判定
+            // 始终记录初始 raw 物理位置供尺寸形变比对（与 e.NewPosition 处于完全相同的坐标系，绝无 DWM 边框差值！）
             using (m_preSnapRectanglesLock.EnterScope())
             {
-                m_activeDragOriginalRect[e.Source] = startPos;
+                m_activeDragOriginalRect[e.Source] = rawStartPos;
             }
 
-            // 无论窗口之前是否贴靠，只要本次交互是点击边框/角落放大缩小，直接进入纯缩放模式，不执行任何分屏逻辑
-            if (isResize)
+            double scale = m_display.Scaling > 0 ? m_display.Scaling : 1.0;
+            bool isBorderResize = IsResizeBorderClick(rawStartPos, cursor, scale);
+
+            // 仅当用户明确点击窗口底部边框或侧边底部缩放手柄时，才在起点拦截；
+            // 拖动顶部标题栏/菜单栏时绝对不拦截，保证顺畅分屏！
+            if (isBorderResize)
             {
                 m_currentInteraction = UserInteraction.Resizing;
                 m_isDraggingTitleBar = false;
                 m_isDraggingSnappedWindow = false;
                 SetPreviewRectangle(null, null);
                 StopDragTrackingTimer();
-                m_logger.Information("[Drag] Window {Window} interaction detected as RESIZING (HitTest={HitTest}), disabling split-screen snapping",
-                    e.Source.DebugString(), hitTest);
+                m_logger.Information("[Drag] Window {Window} interaction detected as BORDER RESIZE, disabling split-screen snapping",
+                    e.Source.DebugString());
                 return;
             }
 
