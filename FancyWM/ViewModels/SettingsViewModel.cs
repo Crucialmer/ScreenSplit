@@ -94,26 +94,6 @@ namespace FancyWM.ViewModels
             }
         }
 
-        public bool RunsAsAdministrator
-        {
-            get => m_runsAsAdministrator;
-            set
-            {
-                if (value)
-                {
-                    File.WriteAllBytes("administrator-mode", []);
-                }
-                else
-                {
-                    File.Delete("administrator-mode");
-                }
-                SetField(ref m_runsAsAdministrator, value);
-            }
-        }
-
-        public static bool IsAdministrator => (new WindowsPrincipal(WindowsIdentity.GetCurrent()))
-                      .IsInRole(WindowsBuiltInRole.Administrator);
-
         public bool OverrideAccentColor { get => m_customAccentColor; set => SetField(ref m_customAccentColor, value); }
 
         public Color CustomAccentColor { get => m_accentColor; set => SetField(ref m_accentColor, value); }
@@ -197,7 +177,6 @@ namespace FancyWM.ViewModels
         public bool SoundOnFailure { get => m_soundOnFailure; set => SetField(ref m_soundOnFailure, value); }
 
         private bool m_runsAtStartup;
-        private bool m_runsAsAdministrator;
         private bool m_showStartupWindow;
         private bool m_hasShownFirstRunPrompt;
         private bool m_notifyVirtualDesktopServiceIncompatibility;
@@ -299,9 +278,15 @@ namespace FancyWM.ViewModels
                 });
             });
 
-            if (File.Exists("administrator-mode"))
+            try
             {
-                SetField(ref m_runsAsAdministrator, true, nameof(RunsAsAdministrator));
+                if (File.Exists("administrator-mode"))
+                {
+                    File.Delete("administrator-mode");
+                }
+            }
+            catch
+            {
             }
         }
 

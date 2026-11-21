@@ -878,19 +878,19 @@ namespace FancyWM
         private ScreenSnapZone GetSnapZone(Point pt, Rectangle wa)
         {
             double scale = m_display.Scaling > 0 ? m_display.Scaling : 1.0;
-            // 贴靠最边缘触发阈值：紧贴物理屏幕最外层边框（~2-3 像素，最大化自由浮动空间，绝不向屏幕内延伸）
-            int edgeMargin = Math.Max(2, (int)Math.Round(3.0 * scale));
-            // 顶角沿边扩展范围：光标沿屏幕边缘滑向顶角时的识别范围（~100-140 像素，占屏幕边缘约 10-12%，完美区分角落与中心半屏）
-            int cornerExtent = Math.Max(100, (int)Math.Round(120.0 * scale));
-            // 顶点对角直入范围：斜向推入顶角顶点时的容差（~32-36 像素，完美匹配鼠标指针自身尺寸）
-            int cornerVertex = Math.Max(28, (int)Math.Round(36.0 * scale));
+            // 贴靠最边缘触发阈值：紧贴物理屏幕最外层 1 像素边框（绝不向屏幕内延伸任何距离，最大化自由浮动空间）
+            int edgeMargin = Math.Max(1, (int)Math.Round(1.0 * scale));
+            // 顶角最顶点触发范围：仅在最顶角微区内触发 1/4 分屏（~12-16 像素，严格符合“最顶点触发”，绝不沿边外延）
+            int cornerExtent = Math.Max(12, (int)Math.Round(16.0 * scale));
+            // 顶点对角直入范围：斜向推入顶点时的极限微区（~8-10 像素）
+            int cornerVertex = Math.Max(8, (int)Math.Round(10.0 * scale));
 
             bool nearLeft = pt.X <= wa.Left + edgeMargin;
             bool nearRight = pt.X >= wa.Right - edgeMargin;
             bool nearTop = pt.Y <= wa.Top + edgeMargin;
             bool nearBottom = pt.Y >= wa.Bottom - edgeMargin;
 
-            // 1. Four Corners (1/4 Layout) - 既支持对角精准推入顶点，也支持沿边滑动进顶角，视觉与手感零死区
+            // 1. Four Corners (1/4 Layout) - 严格最顶点触发
             // Top-Left Quarter
             if ((pt.X <= wa.Left + cornerVertex && pt.Y <= wa.Top + cornerVertex) ||
                 (nearTop && pt.X <= wa.Left + cornerExtent) ||
@@ -923,7 +923,7 @@ namespace FancyWM
                 return ScreenSnapZone.BottomRightQuarter;
             }
 
-            // 2. Four Edges (1/2 Layout) - 仅在超出顶角范围后的最外层物理边缘触发半屏
+            // 2. Four Edges (1/2 Layout) - 仅在超出最顶点微区后的最外层 1px 物理边缘触发半屏
             if (nearLeft)
             {
                 return ScreenSnapZone.LeftHalf;
@@ -989,6 +989,21 @@ namespace FancyWM
                     window.SetState(WindowState.Restored);
                 }
                 window.SetPosition(adjustedRect);
+
+                // ⭐ 强化防回弹保险：在 Windows DWM 模态拖拽循环彻底退出后（~25ms），
+                // 再次确保窗口物理位置锁定在吸附矩形，杜绝任何残余 WM_WINDOWPOSCHANGED 将窗口扯回原拖动点！
+                m_dispatcher.InvokeAsync(async () =>
+                {
+                    await Task.Delay(25);
+                    try
+                    {
+                        if (window.IsAlive)
+                        {
+                            window.SetPosition(adjustedRect);
+                        }
+                    }
+                    catch { }
+                });
             }
             catch (Exception ex)
             {
@@ -1131,55 +1146,58 @@ namespace FancyWM
 
         private Point m_lastPreviewCursor = new Point(-99999, -99999);
 
+        private TimeSpan m_nativeDragButtonUpTime = TimeSpan.Zero;
+
         private void OnDragTrackingTimerTick(object? sender, EventArgs e)
         {
             if (!m_active || m_movingWindow == null)
             {
                 StopDragTrackingTimer();
+                m_nativeDragButtonUpTime = TimeSpan.Zero;
                 return;
             }
 
             var pt = m_workspace.CursorLocation;
 
-            // 实时检测鼠标主按键是否松开（通过直接检测物理按键状态，支持左右手鼠标配置）
-            if (!m_isExternalDrag && (PInvoke.GetAsyncKeyState(1) & 0x8000) == 0 && (PInvoke.GetAsyncKeyState(2) & 0x8000) == 0)
-            {
-                StopDragTrackingTimer();
-                if (m_movingWindow != null)
-                {
-                    var win = m_movingWindow;
-                    m_movingWindow = null;
-                    var interaction = m_currentInteraction;
-                    m_currentInteraction = UserInteraction.None;
-                    m_lastPreviewCursor = new Point(-99999, -99999);
-                    SetPreviewRectangle(null, null);
-                    if (interaction == UserInteraction.Resizing)
-                    {
-                        var finalPos = GetVisibleWindowRectangle(win);
-                        if (finalPos.Width <= 0 || finalPos.Height <= 0) finalPos = win.Position;
-                        var wa = m_display.WorkArea;
-                        if (IsValidFloatingRect(finalPos, wa))
-                        {
-                            using (m_lastFloatingRectanglesLock.EnterScope())
-                            {
-                                m_lastFloatingRectangles[win] = finalPos;
-                            }
-                            RecordFloatingMemory(win, finalPos);
-                        }
-                    }
-                    else
-                    {
-                        DoWindowMove(win);
-                    }
-                }
-                return;
-            }
-
-            // 外部拖动时，实时检测鼠标左键是否已经松开
+            // 外部拖动时（Quicker / 辅助移动工具），实时检测鼠标左键是否已经松开
             if (m_isExternalDrag && (PInvoke.GetAsyncKeyState(1) & 0x8000) == 0)
             {
                 EndExternalDrag();
                 return;
+            }
+
+            // 原生 Windows 拖动：窗口拖动模态循环由操作系统管理，并通过 OnWindowPositionChangeEnd (EVENT_SYSTEM_MOVESIZEEND) 官方通知结束！
+            // 绝不可在鼠标松开瞬间由定时器抢跑提前 DoWindowMove，否则操作系统退出模态循环时会将窗口强行重置回鼠标释放点，导致分屏被覆盖失效！
+            // 仅当鼠标按键松开超过 500ms 且操作系统异常丢失 EVENT_SYSTEM_MOVESIZEEND 时，才作为后备看门狗安全清理。
+            if (!m_isExternalDrag && (PInvoke.GetAsyncKeyState(1) & 0x8000) == 0 && (PInvoke.GetAsyncKeyState(2) & 0x8000) == 0)
+            {
+                if (m_nativeDragButtonUpTime == TimeSpan.Zero)
+                {
+                    m_nativeDragButtonUpTime = m_sw.Elapsed;
+                }
+                else if (m_sw.Elapsed - m_nativeDragButtonUpTime > TimeSpan.FromMilliseconds(500))
+                {
+                    m_nativeDragButtonUpTime = TimeSpan.Zero;
+                    StopDragTrackingTimer();
+                    if (m_movingWindow != null)
+                    {
+                        var win = m_movingWindow;
+                        m_movingWindow = null;
+                        var interaction = m_currentInteraction;
+                        m_currentInteraction = UserInteraction.None;
+                        m_lastPreviewCursor = new Point(-99999, -99999);
+                        SetPreviewRectangle(null, null);
+                        if (interaction != UserInteraction.Resizing)
+                        {
+                            DoWindowMove(win);
+                        }
+                    }
+                    return;
+                }
+            }
+            else
+            {
+                m_nativeDragButtonUpTime = TimeSpan.Zero;
             }
 
             if (pt == m_lastPreviewCursor)
@@ -2387,10 +2405,11 @@ namespace FancyWM
                 return;
 
             StopDragTrackingTimer();
+            m_nativeDragButtonUpTime = TimeSpan.Zero;
             m_lastPreviewCursor = new Point(-99999, -99999);
             SetPreviewRectangle(null, null);
 
-            var win = m_movingWindow;
+            var win = m_movingWindow ?? e.Source;
             m_movingWindow = null;
             bool wasDraggingSnapped = m_isDraggingSnappedWindow;
             bool wasDraggingTitleBar = m_isDraggingTitleBar;

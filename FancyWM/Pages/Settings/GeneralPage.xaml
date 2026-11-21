@@ -34,28 +34,6 @@
                     <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.General_RunsAtStartup}" Margin="0,0,16,0" />
                 </DockPanel>
             </Border>
-            <Border Style="{DynamicResource SettingsItemStyle}">
-                <StackPanel Orientation="Vertical">
-                    <DockPanel LastChildFill="True">
-                        <CheckBox DockPanel.Dock="Right" IsChecked="{Binding Path=RunsAsAdministrator, Mode=TwoWay}" />
-                        <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.General_RunsAsAdmin}" Margin="0,0,16,0" />
-                    </DockPanel>
-                    <TextBlock TextWrapping="WrapWithOverflow" Padding="0,16,0,0" VerticalAlignment="Center" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}">
-                        <TextBlock.Style>
-                            <Style>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsAdministrator}" Value="False">
-                                        <Setter Property="TextBlock.Text" Value="{x:Static res:Strings.General_RunsAsAdmin_NonAdminDescription}" />
-                                    </DataTrigger>
-                                    <DataTrigger Binding="{Binding IsAdministrator}" Value="True">
-                                        <Setter Property="TextBlock.Text" Value="{x:Static res:Strings.General_RunsAsAdmin_AdminDescription}" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
-                </StackPanel>
-            </Border>
 
             <TextBlock Text="{x:Static res:Strings.General_Displays}" Style="{DynamicResource SubtitleTextBlockStyle}" Margin="0, 20" />
 

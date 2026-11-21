@@ -149,22 +149,15 @@ Type 'ScreenSplit --help' from anywhere after installation.
             }
             Directory.SetCurrentDirectory(fullPath);
 
-            if (File.Exists("administrator-mode") && !IsAdministrator())
+            try
             {
-                try
+                if (File.Exists("administrator-mode"))
                 {
-                    Process.Start(new ProcessStartInfo
-                    {
-                        Verb = "runas",
-                        FileName = Environment.ProcessPath!,
-                        UseShellExecute = true,
-                    });
-                    return 0;
+                    File.Delete("administrator-mode");
                 }
-                catch
-                {
-                    // Something went wrong.
-                }
+            }
+            catch
+            {
             }
 
             // Check if another instance is already running using system-wide Mutex
@@ -456,9 +449,9 @@ Type 'ScreenSplit --help' from anywhere after installation.
             if (!string.IsNullOrEmpty(path))
             {
                 var versionInfo = FileVersionInfo.GetVersionInfo(path);
-                return versionInfo.FileVersion ?? "1.0.26.0";
+                return versionInfo.FileVersion ?? "1.0.27.0";
             }
-            return "1.0.26.0";
+            return "1.0.27.0";
         }
 
         private static bool IsAdministrator()
