@@ -879,42 +879,64 @@ namespace FancyWM
         {
             double scale = m_display.Scaling > 0 ? m_display.Scaling : 1.0;
             // 贴靠最边缘触发阈值：紧贴物理屏幕最外层边框（~2 像素，最大化自由浮动空间，绝不向屏幕内延伸）
-            int edgeMargin = Math.Max(2, (int)Math.Round(1.5 * scale));
-            // 最顶点触发阈值：仅在屏幕四个顶角极小区域（~3 像素，顶点精准触发 1/4 分屏）
-            int cornerSize = Math.Max(3, (int)Math.Round(2.5 * scale));
+            int edgeMargin = Math.Max(2, (int)Math.Round(2.0 * scale));
+            // 顶角沿边扩展范围：光标推至顶角区域时沿屏幕边缘的识别范围（~36-45 像素，符合鼠标光标自身尺寸，保证 1/4 分屏 100% 灵敏触发）
+            int cornerExtent = Math.Max(36, (int)Math.Round(42.0 * scale));
+            // 顶点微型对角范围：斜向推入顶角顶点时的容差（~10-12 像素）
+            int cornerVertex = Math.Max(10, (int)Math.Round(12.0 * scale));
 
-            // 1. Four Corners (1/4 Layout) - Must be within corner threshold in both X and Y
-            if (pt.X <= wa.Left + cornerSize && pt.Y <= wa.Top + cornerSize)
+            bool nearLeft = pt.X <= wa.Left + edgeMargin;
+            bool nearRight = pt.X >= wa.Right - edgeMargin;
+            bool nearTop = pt.Y <= wa.Top + edgeMargin;
+            bool nearBottom = pt.Y >= wa.Bottom - edgeMargin;
+
+            // 1. Four Corners (1/4 Layout) - 既支持对角精准推入顶点，也支持沿边滑动进顶角，视觉与手感零盲区
+            // Top-Left Quarter
+            if ((pt.X <= wa.Left + cornerVertex && pt.Y <= wa.Top + cornerVertex) ||
+                (nearTop && pt.X <= wa.Left + cornerExtent) ||
+                (nearLeft && pt.Y <= wa.Top + cornerExtent))
             {
                 return ScreenSnapZone.TopLeftQuarter;
             }
-            if (pt.X >= wa.Right - cornerSize && pt.Y <= wa.Top + cornerSize)
+
+            // Top-Right Quarter
+            if ((pt.X >= wa.Right - cornerVertex && pt.Y <= wa.Top + cornerVertex) ||
+                (nearTop && pt.X >= wa.Right - cornerExtent) ||
+                (nearRight && pt.Y <= wa.Top + cornerExtent))
             {
                 return ScreenSnapZone.TopRightQuarter;
             }
-            if (pt.X <= wa.Left + cornerSize && pt.Y >= wa.Bottom - cornerSize)
+
+            // Bottom-Left Quarter
+            if ((pt.X <= wa.Left + cornerVertex && pt.Y >= wa.Bottom - cornerVertex) ||
+                (nearBottom && pt.X <= wa.Left + cornerExtent) ||
+                (nearLeft && pt.Y >= wa.Bottom - cornerExtent))
             {
                 return ScreenSnapZone.BottomLeftQuarter;
             }
-            if (pt.X >= wa.Right - cornerSize && pt.Y >= wa.Bottom - cornerSize)
+
+            // Bottom-Right Quarter
+            if ((pt.X >= wa.Right - cornerVertex && pt.Y >= wa.Bottom - cornerVertex) ||
+                (nearBottom && pt.X >= wa.Right - cornerExtent) ||
+                (nearRight && pt.Y >= wa.Bottom - cornerExtent))
             {
                 return ScreenSnapZone.BottomRightQuarter;
             }
 
-            // 2. Four Edges (1/2 Layout) - Triggered when near screen edge but outside corner hotzone
-            if (pt.X <= wa.Left + edgeMargin)
+            // 2. Four Edges (1/2 Layout) - 仅在超出顶角范围后的最外层物理边缘触发半屏
+            if (nearLeft)
             {
                 return ScreenSnapZone.LeftHalf;
             }
-            if (pt.X >= wa.Right - edgeMargin)
+            if (nearRight)
             {
                 return ScreenSnapZone.RightHalf;
             }
-            if (pt.Y <= wa.Top + edgeMargin)
+            if (nearTop)
             {
                 return ScreenSnapZone.TopHalf;
             }
-            if (pt.Y >= wa.Bottom - edgeMargin)
+            if (nearBottom)
             {
                 return ScreenSnapZone.BottomHalf;
             }
@@ -978,23 +1000,31 @@ namespace FancyWM
         {
             if (pos.Width <= 0 || pos.Height <= 0) return false;
             int margin = Math.Max(8, (int)Math.Round(8 * scale));
-            int topMargin = Math.Max(6, (int)Math.Round(6 * scale));
+            int topMargin = Math.Max(5, (int)Math.Round(5 * scale));
+            int headerH = Math.Max(60, (int)Math.Round(75 * scale));
 
             // Bottom border or bottom corners
             if (Math.Abs(cursor.Y - pos.Bottom) <= margin)
                 return true;
 
-            // Top border or top corners
+            // Top border (only the top 5px edge)
             if (Math.Abs(cursor.Y - pos.Top) <= topMargin)
                 return true;
 
-            // Left border or left corners
-            if (Math.Abs(cursor.X - pos.Left) <= margin)
-                return true;
+            // Left or Right border strictly below the header area
+            if (cursor.Y > pos.Top + headerH)
+            {
+                if (Math.Abs(cursor.X - pos.Left) <= margin || Math.Abs(cursor.X - pos.Right) <= margin)
+                    return true;
+            }
 
-            // Right border or right corners
-            if (Math.Abs(cursor.X - pos.Right) <= margin)
-                return true;
+            // In header area (titlebar + menubar): only extreme outer 4px is considered border resize
+            int sideMarginInHeader = Math.Max(4, (int)Math.Round(4 * scale));
+            if (cursor.Y <= pos.Top + headerH)
+            {
+                if (Math.Abs(cursor.X - pos.Left) <= sideMarginInHeader || Math.Abs(cursor.X - pos.Right) <= sideMarginInHeader)
+                    return true;
+            }
 
             return false;
         }
@@ -2915,14 +2945,15 @@ namespace FancyWM
                 m_currentDragTargetSize = new WinMan.Point(startPos.Width, startPos.Height);
             }
 
-            int borderMargin = Math.Max(8, (int)Math.Round(8 * scale));
-            int topHeaderHeight = Math.Max(40, (int)Math.Round(45 * scale));
+            int sideMargin = Math.Max(5, (int)Math.Round(5 * scale));
+            int topMargin = Math.Max(5, (int)Math.Round(5 * scale));
+            int topHeaderHeight = Math.Max(60, (int)Math.Round(75 * scale));
 
-            // 严格位于窗口顶部内侧（距离上、左、右各边框均保留安全间距，完全排除四周边框缩放区域）
-            bool inTitleBarArea = cursor.Y > rawStartPos.Top + borderMargin &&
+            // 严格位于窗口顶部内侧（完整覆盖标题栏与菜单栏，排除外层边框缩放区域）
+            bool inTitleBarArea = cursor.Y > rawStartPos.Top + topMargin &&
                                   cursor.Y <= rawStartPos.Top + topHeaderHeight &&
-                                  cursor.X > rawStartPos.Left + borderMargin &&
-                                  cursor.X < rawStartPos.Right - borderMargin;
+                                  cursor.X > rawStartPos.Left + sideMargin &&
+                                  cursor.X < rawStartPos.Right - sideMargin;
             m_isDraggingTitleBar = inTitleBarArea;
             m_currentInteraction = UserInteraction.Moving;
 
