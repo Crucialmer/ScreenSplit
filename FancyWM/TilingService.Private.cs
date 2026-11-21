@@ -878,21 +878,19 @@ namespace FancyWM
         private ScreenSnapZone GetSnapZone(Point pt, Rectangle wa)
         {
             double scale = m_display.Scaling > 0 ? m_display.Scaling : 1.0;
-            // 贴靠最边缘触发阈值：紧贴物理屏幕最外层 1 像素边框（绝不向屏幕内延伸任何距离，最大化自由浮动空间）
+            // 贴靠最边缘触发阈值：紧贴物理屏幕最外层 1 像素物理边框（最大化自由浮动空间）
             int edgeMargin = Math.Max(1, (int)Math.Round(1.0 * scale));
-            // 顶角最顶点触发范围：仅在最顶角微区内触发 1/4 分屏（~12-16 像素，严格符合“最顶点触发”，绝不沿边外延）
-            int cornerExtent = Math.Max(12, (int)Math.Round(16.0 * scale));
-            // 顶点对角直入范围：斜向推入顶点时的极限微区（~8-10 像素）
-            int cornerVertex = Math.Max(8, (int)Math.Round(10.0 * scale));
+            // 顶角最顶点触发微区：收窄至极限物理最小尺寸（1~2 像素），必须物理触及边缘，绝不向屏幕内部悬空延伸
+            int cornerExtent = Math.Max(1, (int)Math.Round(1.5 * scale));
 
             bool nearLeft = pt.X <= wa.Left + edgeMargin;
             bool nearRight = pt.X >= wa.Right - edgeMargin;
             bool nearTop = pt.Y <= wa.Top + edgeMargin;
             bool nearBottom = pt.Y >= wa.Bottom - edgeMargin;
 
-            // 1. Four Corners (1/4 Layout) - 严格最顶点触发
+            // 1. Four Corners (1/4 Layout) - 严格最顶点极限微区（必须贴靠边缘且处于最顶点 1~2px 范围内）
             // Top-Left Quarter
-            if ((pt.X <= wa.Left + cornerVertex && pt.Y <= wa.Top + cornerVertex) ||
+            if ((nearTop && nearLeft) ||
                 (nearTop && pt.X <= wa.Left + cornerExtent) ||
                 (nearLeft && pt.Y <= wa.Top + cornerExtent))
             {
@@ -900,7 +898,7 @@ namespace FancyWM
             }
 
             // Top-Right Quarter
-            if ((pt.X >= wa.Right - cornerVertex && pt.Y <= wa.Top + cornerVertex) ||
+            if ((nearTop && nearRight) ||
                 (nearTop && pt.X >= wa.Right - cornerExtent) ||
                 (nearRight && pt.Y <= wa.Top + cornerExtent))
             {
@@ -908,7 +906,7 @@ namespace FancyWM
             }
 
             // Bottom-Left Quarter
-            if ((pt.X <= wa.Left + cornerVertex && pt.Y >= wa.Bottom - cornerVertex) ||
+            if ((nearBottom && nearLeft) ||
                 (nearBottom && pt.X <= wa.Left + cornerExtent) ||
                 (nearLeft && pt.Y >= wa.Bottom - cornerExtent))
             {
@@ -916,7 +914,7 @@ namespace FancyWM
             }
 
             // Bottom-Right Quarter
-            if ((pt.X >= wa.Right - cornerVertex && pt.Y >= wa.Bottom - cornerVertex) ||
+            if ((nearBottom && nearRight) ||
                 (nearBottom && pt.X >= wa.Right - cornerExtent) ||
                 (nearRight && pt.Y >= wa.Bottom - cornerExtent))
             {
