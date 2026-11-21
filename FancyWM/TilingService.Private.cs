@@ -974,11 +974,81 @@ namespace FancyWM
             }
         }
 
+        private static int GetWindowHitTest(IntPtr hwnd, WinMan.Point pt)
+        {
+            if (hwnd == IntPtr.Zero) return 0;
+            try
+            {
+                unsafe
+                {
+                    nuint result = 0;
+                    nint lp = (nint)(((long)pt.Y << 16) | ((long)pt.X & 0xFFFF));
+                    var ret = PInvoke.SendMessageTimeout(
+                        new(hwnd),
+                        0x0084u, // WM_NCHITTEST
+                        new(0),
+                        (LPARAM)lp,
+                        SendMessageTimeout_fuFlags.SMTO_ABORTIFHUNG | SendMessageTimeout_fuFlags.SMTO_NORMAL,
+                        35,
+                        &result);
+                    if (ret != 0)
+                    {
+                        return (int)(long)result;
+                    }
+                }
+            }
+            catch { }
+            return 0;
+        }
+
+        private static bool IsResizeHitTest(int hitTest)
+        {
+            // HTGROWBOX/HTSIZE (4), HTLEFT (10), HTRIGHT (11), HTTOP (12), HTTOPLEFT (13),
+            // HTTOPRIGHT (14), HTBOTTOM (15), HTBOTTOMLEFT (16), HTBOTTOMRIGHT (17), HTBORDER (18)
+            return hitTest is 4 or >= 10 and <= 18;
+        }
+
+        private bool IsGeometricResizeBorder(Rectangle startPos, WinMan.Point cursor)
+        {
+            if (startPos.Width <= 0 || startPos.Height <= 0) return false;
+            double scale = m_display.Scaling > 0 ? m_display.Scaling : 1.0;
+            int borderMargin = Math.Max(8, (int)Math.Round(8 * scale));
+
+            // Must be near the window perimeter
+            if (cursor.X < startPos.Left - borderMargin || cursor.X > startPos.Right + borderMargin ||
+                cursor.Y < startPos.Top - borderMargin || cursor.Y > startPos.Bottom + borderMargin)
+            {
+                return false;
+            }
+
+            // Left, Right, Bottom borders
+            if (Math.Abs(cursor.X - startPos.Left) <= borderMargin ||
+                Math.Abs(cursor.X - startPos.Right) <= borderMargin ||
+                Math.Abs(cursor.Y - startPos.Bottom) <= borderMargin)
+            {
+                return true;
+            }
+
+            // Top border (top 4-5px sizing grip)
+            if (cursor.Y <= startPos.Top + Math.Max(4, (int)Math.Round(4 * scale)))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
         private (Rectangle? Rect, string? Title) GetPreviewInfo() => GetPreviewInfo(m_workspace.CursorLocation);
 
         private (Rectangle? Rect, string? Title) GetPreviewInfo(Point pt)
         {
-            if (m_currentInteraction == UserInteraction.Moving || m_movingWindow != null || m_movingPanelNode != null)
+            // 严格切割：窗口放大/缩小（Resizing）时绝对不触发分屏预览
+            if (m_currentInteraction == UserInteraction.Resizing)
+            {
+                return (null, null);
+            }
+
+            if (m_currentInteraction == UserInteraction.Moving || m_movingPanelNode != null)
             {
                 try
                 {
@@ -1057,10 +1127,28 @@ namespace FancyWM
                 {
                     var win = m_movingWindow;
                     m_movingWindow = null;
+                    var interaction = m_currentInteraction;
                     m_currentInteraction = UserInteraction.None;
                     m_lastPreviewCursor = new Point(-99999, -99999);
                     SetPreviewRectangle(null, null);
-                    DoWindowMove(win);
+                    if (interaction == UserInteraction.Moving)
+                    {
+                        DoWindowMove(win);
+                    }
+                    else if (interaction == UserInteraction.Resizing)
+                    {
+                        var finalPos = GetVisibleWindowRectangle(win);
+                        if (finalPos.Width <= 0 || finalPos.Height <= 0) finalPos = win.Position;
+                        var wa = m_display.WorkArea;
+                        if (IsValidFloatingRect(finalPos, wa))
+                        {
+                            using (m_lastFloatingRectanglesLock.EnterScope())
+                            {
+                                m_lastFloatingRectangles[win] = finalPos;
+                            }
+                            RecordFloatingMemory(win, finalPos);
+                        }
+                    }
                 }
                 return;
             }
@@ -1471,7 +1559,7 @@ namespace FancyWM
 
         private void OnCursorLocationChanged(object? sender, CursorLocationChangedEventArgs e)
         {
-            if (m_currentInteraction == UserInteraction.Moving || m_movingWindow != null)
+            if (m_currentInteraction == UserInteraction.Moving)
             {
                 UpdateDragPreview(e.NewLocation);
             }
@@ -2239,8 +2327,12 @@ namespace FancyWM
             m_movingWindow = null;
             bool wasDraggingSnapped = m_isDraggingSnappedWindow;
             bool wasDraggingTitleBar = m_isDraggingTitleBar;
+            var interaction = m_currentInteraction;
+            m_currentInteraction = UserInteraction.None;
+            m_isDraggingTitleBar = false;
+            m_isDraggingSnappedWindow = false;
 
-            if (win != null && m_currentInteraction == UserInteraction.Moving)
+            if (win != null && interaction == UserInteraction.Moving)
             {
                 try
                 {
@@ -2257,23 +2349,25 @@ namespace FancyWM
                 {
                     m_logger.Warning(ex, "Error handling window move end for {Window}", win.DebugString());
                 }
-                finally
+            }
+            else if (win != null && interaction == UserInteraction.Resizing)
+            {
+                var finalPos = GetVisibleWindowRectangle(win);
+                if (finalPos.Width <= 0 || finalPos.Height <= 0)
                 {
-                    m_currentInteraction = UserInteraction.None;
-                    m_isDraggingTitleBar = false;
-                    m_isDraggingSnappedWindow = false;
+                    finalPos = e.NewPosition;
+                }
+                var wa = m_display.WorkArea;
+                if (IsValidFloatingRect(finalPos, wa))
+                {
+                    using (m_lastFloatingRectanglesLock.EnterScope())
+                    {
+                        m_lastFloatingRectangles[win] = finalPos;
+                    }
+                    RecordFloatingMemory(win, finalPos);
+                    m_logger.Information("Window {Window} manually resized to {Rect}, recorded in floating memory (no snap)", win.DebugString(), finalPos);
                 }
             }
-            else
-            {
-                m_currentInteraction = UserInteraction.None;
-                m_isDraggingTitleBar = false;
-                m_isDraggingSnappedWindow = false;
-            }
-
-            m_currentInteraction = UserInteraction.None;
-            m_isDraggingTitleBar = false;
-            m_isDraggingSnappedWindow = false;
 
             m_logger.Information("Window {Window} move/resize ended", e.Source.DebugString());
             InvalidateLayout();
@@ -2397,34 +2491,47 @@ namespace FancyWM
                 RecordFloatingMemory(e.Source, curPos);
             }
 
-            bool isSizePreserved = Math.Abs(e.OldPosition.Width - e.NewPosition.Width) <= 5 &&
-                                   Math.Abs(e.OldPosition.Height - e.NewPosition.Height) <= 5;
-
-            if (m_currentInteraction == UserInteraction.Starting || m_currentInteraction == UserInteraction.Moving)
+            if (m_currentInteraction == UserInteraction.Resizing)
             {
-                // Only consider it a manual border resize if not dragging a snapped window and not dragging by title bar and not an external drag
-                if (!m_isDraggingSnappedWindow && !m_isDraggingTitleBar && !m_isExternalDrag && !isSizePreserved)
-                {
-                    m_currentInteraction = UserInteraction.Resizing;
-                    StopDragTrackingTimer();
-                    m_lastPreviewCursor = new Point(-99999, -99999);
-                    SetPreviewRectangle(null, null);
-                    using (m_preSnapRectanglesLock.EnterScope())
-                    {
-                        m_preSnapRectangles.Remove(e.Source);
-                        m_activeDragOriginalRect.Remove(e.Source);
-                    }
-                    using (m_snappedWindowsLock.EnterScope())
-                    {
-                        m_snappedWindows.Remove(e.Source);
-                    }
-                }
-                else
-                {
-                    m_currentInteraction = UserInteraction.Moving;
-                }
+                SetPreviewRectangle(null, null);
+                return;
             }
 
+            Rectangle startRect = default;
+            using (m_preSnapRectanglesLock.EnterScope())
+            {
+                m_activeDragOriginalRect.TryGetValue(e.Source, out startRect);
+            }
+
+            int dW = startRect.Width > 0 ? Math.Abs(e.NewPosition.Width - startRect.Width) : 0;
+            int dH = startRect.Height > 0 ? Math.Abs(e.NewPosition.Height - startRect.Height) : 0;
+
+            // 如果窗口尺寸相对于拖动开始发生变化（大于 6 像素），且不是贴靠窗口拖拽还原，则确认为用户手动缩放界面（放大/缩小）
+            if (!m_isDraggingSnappedWindow && (dW > 6 || dH > 6))
+            {
+                m_currentInteraction = UserInteraction.Resizing;
+                m_isDraggingTitleBar = false;
+                StopDragTrackingTimer();
+                m_lastPreviewCursor = new Point(-99999, -99999);
+                SetPreviewRectangle(null, null);
+                using (m_preSnapRectanglesLock.EnterScope())
+                {
+                    m_preSnapRectangles.Remove(e.Source);
+                    m_activeDragOriginalRect.Remove(e.Source);
+                }
+                using (m_snappedWindowsLock.EnterScope())
+                {
+                    m_snappedWindows.Remove(e.Source);
+                }
+                m_logger.Information("Window {Window} size changed (dW={DW}, dH={DH}), switching to RESIZING mode, disabling split screen",
+                    e.Source.DebugString(), dW, dH);
+                return;
+            }
+
+            if (m_currentInteraction == UserInteraction.Starting)
+            {
+                m_currentInteraction = UserInteraction.Moving;
+            }
 
             try
             {
@@ -2435,7 +2542,7 @@ namespace FancyWM
                     return;
                 }
 
-                if (m_currentInteraction == UserInteraction.Moving || m_movingWindow != null)
+                if (m_currentInteraction == UserInteraction.Moving)
                 {
                     UpdateDragPreview(m_workspace.CursorLocation);
                 }
@@ -2705,6 +2812,32 @@ namespace FancyWM
                 startPos = e.OldPosition.Width > 0 ? e.OldPosition : e.Source.Position;
             }
 
+            // ⭐ 核心优化：Win32 Hit-Test 与几何边缘检测，彻底将“窗口放大缩小”与“分屏功能”切割开！
+            int hitTest = GetWindowHitTest(e.Source.Handle, cursor);
+            bool isResize = IsResizeHitTest(hitTest);
+            if (!isResize && hitTest == 0)
+            {
+                isResize = IsGeometricResizeBorder(startPos, cursor);
+            }
+
+            // 始终记录初始位置以供多层判定
+            using (m_preSnapRectanglesLock.EnterScope())
+            {
+                m_activeDragOriginalRect[e.Source] = startPos;
+            }
+
+            // 无论窗口之前是否贴靠，只要本次交互是点击边框/角落放大缩小，直接进入纯缩放模式，不执行任何分屏逻辑
+            if (isResize)
+            {
+                m_currentInteraction = UserInteraction.Resizing;
+                m_isDraggingTitleBar = false;
+                m_isDraggingSnappedWindow = false;
+                SetPreviewRectangle(null, null);
+                StopDragTrackingTimer();
+                m_logger.Information("[Drag] Window {Window} interaction detected as RESIZING (HitTest={HitTest}), disabling split-screen snapping",
+                    e.Source.DebugString(), hitTest);
+                return;
+            }
 
             m_logger.Information("[Drag] PositionChangeStart on {Window}, Pos={Pos}, Cursor={Cursor}", e.Source.DebugString(), startPos, cursor);
             if (startPos.Width > 0)
