@@ -1009,26 +1009,55 @@ namespace FancyWM
             }
         }
 
-        private static bool IsResizeBorderClick(Rectangle pos, WinMan.Point cursor, double scale)
+        private static bool IsResizeBorderClick(Rectangle visiblePos, Rectangle rawPos, WinMan.Point cursor, double scale)
         {
-            if (pos.Width <= 0 || pos.Height <= 0) return false;
-            int margin = Math.Max(8, (int)Math.Round(8 * scale));
-            int headerH = Math.Max(60, (int)Math.Round(75 * scale));
-
-            // Bottom border or bottom corners (definitely resizing)
-            if (Math.Abs(cursor.Y - pos.Bottom) <= margin)
-                return true;
-
-            // Left or Right border strictly below the header area
-            if (cursor.Y > pos.Top + headerH)
+            if (visiblePos.Width <= 0 || visiblePos.Height <= 0)
             {
-                if (Math.Abs(cursor.X - pos.Left) <= margin || Math.Abs(cursor.X - pos.Right) <= margin)
-                    return true;
+                if (rawPos.Width <= 0 || rawPos.Height <= 0) return false;
+                visiblePos = rawPos;
+            }
+            if (rawPos.Width <= 0 || rawPos.Height <= 0)
+            {
+                rawPos = visiblePos;
             }
 
-            // Note: Header area (title bar, menu bar, tabs) is NEVER intercepted as border resize at click start.
-            // Actual border resizing will immediately change window dimensions (dW > 8 or dH > 8) during drag,
-            // which is dynamically detected and handled in OnWindowPositionChanged with 100% precision!
+            int topMargin = Math.Max(4, (int)Math.Round(5 * scale));
+            int sideMargin = Math.Max(5, (int)Math.Round(6 * scale));
+            int bottomMargin = Math.Max(6, (int)Math.Round(8 * scale));
+
+            // 1. 顶边框及顶部两角（Top / Top-Left / Top-Right Resize）：
+            // 鼠标必须极其精准地位于窗口顶边极窄缝隙内（通常 <= 5px），系统显示垂直缩放光标 ↕
+            // 用户拖动标题栏/菜单栏时，点击点在顶边 6px 往下（通常距离顶端 8-40px），绝不会被误判！
+            bool isTopBorder = (cursor.Y >= visiblePos.Top - topMargin && cursor.Y <= visiblePos.Top + topMargin &&
+                                cursor.X >= visiblePos.Left - 10 && cursor.X <= visiblePos.Right + 10) ||
+                               (Math.Abs(cursor.Y - rawPos.Top) <= topMargin &&
+                                cursor.X >= rawPos.Left - 10 && cursor.X <= rawPos.Right + 10);
+            if (isTopBorder)
+                return true;
+
+            // 2. 底边框及底部两角（Bottom / Bottom-Left / Bottom-Right Resize）
+            bool isBottomBorder = (cursor.Y >= visiblePos.Bottom - bottomMargin && cursor.Y <= visiblePos.Bottom + bottomMargin + 8 &&
+                                   cursor.X >= visiblePos.Left - 10 && cursor.X <= visiblePos.Right + 10) ||
+                                  Math.Abs(cursor.Y - rawPos.Bottom) <= bottomMargin;
+            if (isBottomBorder)
+                return true;
+
+            // 3. 左边框（Left Resize）及右边框（Right Resize）：
+            // 无论在窗口上部或下部，只要在边缘极窄侧缝内，均属于边框缩放！
+            bool isLeftBorder = (cursor.X >= visiblePos.Left - sideMargin - 4 && cursor.X <= visiblePos.Left + sideMargin &&
+                                 cursor.Y >= visiblePos.Top - 10 && cursor.Y <= visiblePos.Bottom + 10) ||
+                                (Math.Abs(cursor.X - rawPos.Left) <= sideMargin &&
+                                 cursor.Y >= rawPos.Top - 10 && cursor.Y <= rawPos.Bottom + 10);
+            if (isLeftBorder)
+                return true;
+
+            bool isRightBorder = (cursor.X >= visiblePos.Right - sideMargin && cursor.X <= visiblePos.Right + sideMargin + 6 &&
+                                  cursor.Y >= visiblePos.Top - 10 && cursor.Y <= visiblePos.Bottom + 10) ||
+                                 (Math.Abs(cursor.X - rawPos.Right) <= sideMargin &&
+                                  cursor.Y >= rawPos.Top - 10 && cursor.Y <= rawPos.Bottom + 10);
+            if (isRightBorder)
+                return true;
+
             return false;
         }
 
@@ -1149,6 +1178,36 @@ namespace FancyWM
                 StopDragTrackingTimer();
                 m_nativeDragButtonUpTime = TimeSpan.Zero;
                 return;
+            }
+
+            if (m_currentInteraction == UserInteraction.Resizing)
+            {
+                StopDragTrackingTimer();
+                SetPreviewRectangle(null, null);
+                return;
+            }
+
+            // 实时物理尺寸形变防御：在拖拽边框缩放窗口时，若窗口尺寸已发生形变（> 3px），立即锁定 Resizing 并停止定时器，防止定时器抢跑弹出贴边分屏预览
+            if (!m_isDraggingSnappedWindow && !m_isExternalDrag)
+            {
+                Rectangle initialRaw;
+                using (m_preSnapRectanglesLock.EnterScope())
+                {
+                    m_activeDragInitialRawRect.TryGetValue(m_movingWindow, out initialRaw);
+                }
+                if (initialRaw.Width > 0 && initialRaw.Height > 0)
+                {
+                    var curPos = m_movingWindow.Position;
+                    if (Math.Abs(curPos.Width - initialRaw.Width) > 3 || Math.Abs(curPos.Height - initialRaw.Height) > 3)
+                    {
+                        m_currentInteraction = UserInteraction.Resizing;
+                        m_isDraggingTitleBar = false;
+                        StopDragTrackingTimer();
+                        m_lastPreviewCursor = new Point(-99999, -99999);
+                        SetPreviewRectangle(null, null);
+                        return;
+                    }
+                }
             }
 
             var pt = m_workspace.CursorLocation;
@@ -2587,8 +2646,8 @@ namespace FancyWM
             int dW = rawStartRect.Width > 0 ? Math.Abs(e.NewPosition.Width - rawStartRect.Width) : 0;
             int dH = rawStartRect.Height > 0 ? Math.Abs(e.NewPosition.Height - rawStartRect.Height) : 0;
 
-            // 尺寸形变判定：只要不是贴靠窗口拖拽还原、也不是外部拖动，一旦窗口尺寸发生形变（大于 8 像素），确认为用户正在手动缩放边框（放大/缩小）
-            bool isSizeChanged = !m_isDraggingSnappedWindow && !m_isExternalDrag && (dW > 8 || dH > 8);
+            // 尺寸形变判定：只要不是贴靠窗口拖拽还原、也不是外部拖动，一旦窗口尺寸发生形变（大于 3 像素），确认为用户正在手动缩放边框（放大/缩小）
+            bool isSizeChanged = !m_isDraggingSnappedWindow && !m_isExternalDrag && (dW > 3 || dH > 3);
             if (isSizeChanged)
             {
                 m_currentInteraction = UserInteraction.Resizing;
@@ -2905,10 +2964,10 @@ namespace FancyWM
             }
 
             double scale = m_display.Scaling > 0 ? m_display.Scaling : 1.0;
-            bool isBorderResize = IsResizeBorderClick(rawStartPos, cursor, scale);
+            bool isBorderResize = IsResizeBorderClick(startPos, rawStartPos, cursor, scale);
 
-            // 仅当用户明确点击窗口底部边框或侧边底部缩放手柄时，才在起点拦截；
-            // 拖动顶部标题栏/菜单栏时绝对不拦截，保证顺畅分屏！
+            // 严格边框缩放拦截：无论用户从顶边、底边、左边、右边或四角哪个边框调整窗口大小，
+            // 均在起点立即锁定为 RESIZING 模式，彻底杜绝调整尺寸时误触发贴边分屏！
             if (isBorderResize)
             {
                 m_currentInteraction = UserInteraction.Resizing;
