@@ -2380,21 +2380,39 @@ namespace FancyWM
                 targetW = Math.Clamp(targetW, 100, wa.Width);
                 targetH = Math.Clamp(targetH, 80, wa.Height);
 
-                int targetX = pt.X - (int)(targetW * m_dragGrabRatioX);
-                int targetY = pt.Y - (int)(targetH * m_dragGrabRatioY);
+                // ⭐ 核心优化：以用户实际拖放到达的物理位置（curPos）为绝对基准！
+                // 彻底废除比例（Ratio）计算，解决因宽高不同产生的像素漂移跳动问题。
+                var curPos = GetVisibleWindowRectangle(window);
+                if (curPos.Width <= 0 || curPos.Height <= 0)
+                {
+                    curPos = window.Position;
+                }
 
-                if (targetX < wa.Left) targetX = wa.Left;
+                // 1. 垂直方向（Y轴）：标题栏高度固定，顶边严格保持在用户当前放置的 Y 坐标，Y轴绝对 0 偏移！
+                int targetY = curPos.Top;
+
+                // 2. 水平方向（X轴）：优先保持左上角不动（所见即所得）；
+                // 若鼠标在窗口内的实际偏移仍在还原后窗口的标题栏范围内，左边框完全不动；
+                // 仅当光标过于靠右时平滑将光标保留在标题栏内。
+                int grabOffsetX = pt.X - curPos.Left;
+                int targetX = curPos.Left;
+                if (grabOffsetX > targetW - 60)
+                {
+                    targetX = pt.X - (targetW - 60);
+                }
+                else if (grabOffsetX < 20)
+                {
+                    targetX = pt.X - Math.Max(20, grabOffsetX);
+                }
+
+                // 屏幕工作区保护
                 if (targetX + targetW > wa.Right) targetX = wa.Right - targetW;
-                if (targetY < wa.Top) targetY = wa.Top;
+                if (targetX < wa.Left) targetX = wa.Left;
                 if (targetY + targetH > wa.Bottom) targetY = wa.Bottom - targetH;
+                if (targetY < wa.Top) targetY = wa.Top;
 
                 var restoredRect = Rectangle.OffsetAndSize(targetX, targetY, targetW, targetH);
                 ApplyWindowSnap(window, restoredRect);
-                PInvoke.SetWindowPos(
-                    new(window.Handle),
-                    new(),
-                    restoredRect.Left, restoredRect.Top, restoredRect.Width, restoredRect.Height,
-                    SetWindowPos_uFlags.SWP_NOZORDER | SetWindowPos_uFlags.SWP_NOACTIVATE);
 
                 // 持续保留该真实浮动大小记忆，供后续再次贴靠或拖出使用
                 using (m_lastFloatingRectanglesLock.EnterScope())
@@ -2410,28 +2428,6 @@ namespace FancyWM
                     m_snappedWindows.Remove(window);
                 }
                 RecordFloatingMemory(window, restoredRect);
-
-                // ⭐ 核心防覆写 Watchdog：延迟 40ms 确保 Quicker 等外部工具在松手退出循环时的残余位置更新不会覆盖恢复后的尺寸！
-                var capturedRestoredRect = restoredRect;
-                m_dispatcher.InvokeAsync(async () =>
-                {
-                    await Task.Delay(40);
-                    try
-                    {
-                        var curRect = GetVisibleWindowRectangle(window);
-                        if (Math.Abs(curRect.Width - capturedRestoredRect.Width) > 30 ||
-                            Math.Abs(curRect.Height - capturedRestoredRect.Height) > 30)
-                        {
-                            ApplyWindowSnap(window, capturedRestoredRect);
-                            PInvoke.SetWindowPos(
-                                new(window.Handle),
-                                new(),
-                                capturedRestoredRect.Left, capturedRestoredRect.Top, capturedRestoredRect.Width, capturedRestoredRect.Height,
-                                SetWindowPos_uFlags.SWP_NOZORDER | SetWindowPos_uFlags.SWP_NOACTIVATE);
-                        }
-                    }
-                    catch { }
-                });
             }
             m_isDraggingSnappedWindow = false;
             m_isDraggingTitleBar = false;
