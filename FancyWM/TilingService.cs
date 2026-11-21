@@ -186,6 +186,7 @@ namespace FancyWM
         private IWindow? m_movingWindow;
         private bool m_isDraggingTitleBar = false;
         private bool m_isDraggingSnappedWindow = false;
+        private WinMan.Point m_activeDragStartCursor = default;
         private WinMan.Point m_currentDragTargetSize = default;
         private readonly DispatcherTimer m_dragTrackingTimer;
         private bool m_isExternalDrag = false;

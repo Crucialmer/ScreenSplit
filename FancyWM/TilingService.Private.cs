@@ -1212,6 +1212,17 @@ namespace FancyWM
 
             var pt = m_workspace.CursorLocation;
 
+            // 方案 B：高频定时器实时检测贴靠窗口拖出边缘并即时缩小跟随鼠标（Win11 风格）
+            if (m_isDraggingSnappedWindow && m_movingWindow != null && !m_isExternalDrag)
+            {
+                var curWa = m_display.WorkArea;
+                if (TryPerformMidAirUnsnapResize(m_movingWindow, curWa, pt))
+                {
+                    SetPreviewRectangle(null, null);
+                    return;
+                }
+            }
+
             // 外部拖动时（Quicker / 辅助移动工具），实时检测鼠标左键是否已经松开
             if (m_isExternalDrag && (PInvoke.GetAsyncKeyState(1) & 0x8000) == 0)
             {
@@ -1288,6 +1299,82 @@ namespace FancyWM
                 m_logger.Information("[Drag] External drag timed out after 1500ms of inactivity");
                 EndExternalDrag();
             }
+        }
+
+        private bool TryPerformMidAirUnsnapResize(IWindow window, Rectangle curWa, Point cursor)
+        {
+            if (!m_isDraggingSnappedWindow || !Equals(m_movingWindow, window) || m_isExternalDrag)
+                return false;
+
+            int dx = Math.Abs(cursor.X - m_activeDragStartCursor.X);
+            int dy = Math.Abs(cursor.Y - m_activeDragStartCursor.Y);
+            if (dx <= 15 && dy <= 15)
+                return false;
+
+            var zone = GetSnapZone(cursor, curWa);
+            if (zone != ScreenSnapZone.None)
+                return false;
+
+            Rectangle preSnapRect = default;
+            using (m_preSnapRectanglesLock.EnterScope())
+            {
+                m_preSnapRectangles.TryGetValue(window, out preSnapRect);
+            }
+            if (preSnapRect.Width <= 0 || preSnapRect.Height <= 0)
+            {
+                preSnapRect = GetBestFloatingRectangle(window, curWa, window.Position);
+            }
+
+            int targetW = preSnapRect.Width;
+            int targetH = preSnapRect.Height;
+
+            if (!IsValidFloatingDimensions(targetW, targetH, curWa) || IsWindowSnappedGeometry(preSnapRect, curWa))
+            {
+                var best = GetBestFloatingRectangle(window, curWa, window.Position);
+                targetW = IsValidFloatingRect(best, curWa) ? best.Width : (int)(curWa.Width * 0.60);
+                targetH = IsValidFloatingRect(best, curWa) ? best.Height : (int)(curWa.Height * 0.65);
+            }
+            targetW = Math.Clamp(targetW, 100, curWa.Width);
+            targetH = Math.Clamp(targetH, 80, curWa.Height);
+
+            int targetX = cursor.X - (int)(targetW * m_dragGrabRatioX);
+            int targetY = cursor.Y - (int)(targetH * m_dragGrabRatioY);
+
+            if (targetX < curWa.Left) targetX = curWa.Left;
+            if (targetX + targetW > curWa.Right) targetX = curWa.Right - targetW;
+            if (targetY < curWa.Top) targetY = curWa.Top;
+            if (targetY + targetH > curWa.Bottom) targetY = curWa.Bottom - targetH;
+
+            var realFloatRect = Rectangle.OffsetAndSize(targetX, targetY, targetW, targetH);
+            ApplyWindowSnap(window, realFloatRect);
+            PInvoke.SetWindowPos(
+                new(window.Handle),
+                new(),
+                realFloatRect.Left, realFloatRect.Top, realFloatRect.Width, realFloatRect.Height,
+                SetWindowPos_uFlags.SWP_NOZORDER | SetWindowPos_uFlags.SWP_NOACTIVATE);
+
+            m_isDraggingSnappedWindow = false;
+            m_currentDragTargetSize = new Point(realFloatRect.Width, realFloatRect.Height);
+
+            using (m_snappedWindowsLock.EnterScope())
+            {
+                m_snappedWindows.Remove(window);
+            }
+            using (m_preSnapRectanglesLock.EnterScope())
+            {
+                m_preSnapRectangles.Remove(window);
+                m_activeDragInitialRawRect[window] = realFloatRect;
+                m_activeDragOriginalRect[window] = realFloatRect;
+            }
+            using (m_lastFloatingRectanglesLock.EnterScope())
+            {
+                m_lastFloatingRectangles[window] = realFloatRect;
+            }
+            RecordFloatingMemory(window, realFloatRect);
+
+            m_logger.Information("[Drag] Scheme B: Mid-air instant unsnap resize for {Window}, new rect={Rect}",
+                window.DebugString(), realFloatRect);
+            return true;
         }
 
         private void StartExternalDrag(IWindow window, Rectangle pos, Rectangle initialPos, Point cursor)
@@ -2627,6 +2714,17 @@ namespace FancyWM
                 RecordFloatingMemory(e.Source, curPos);
             }
 
+            // 方案 B：拖拽贴靠窗口离开边缘时即时平滑脱离（Win11 风格实时缩小为原始尺寸）
+            if (m_isDraggingSnappedWindow && Equals(m_movingWindow, e.Source) && !m_isExternalDrag)
+            {
+                var curPt = m_workspace.CursorLocation;
+                if (TryPerformMidAirUnsnapResize(e.Source, curWa, curPt))
+                {
+                    SetPreviewRectangle(null, null);
+                    return;
+                }
+            }
+
             if (m_currentInteraction == UserInteraction.Resizing)
             {
                 SetPreviewRectangle(null, null);
@@ -2944,6 +3042,7 @@ namespace FancyWM
             m_currentInteraction = UserInteraction.Moving;
 
             var cursor = m_workspace.CursorLocation;
+            m_activeDragStartCursor = cursor;
             Rectangle rawStartPos = e.NewPosition.Width > 0 ? e.NewPosition : e.Source.Position;
             Rectangle startPos = GetVisibleWindowRectangle(e.Source);
             if (startPos.Width <= 0 || startPos.Height <= 0)
