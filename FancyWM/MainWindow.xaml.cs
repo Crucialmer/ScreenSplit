@@ -427,50 +427,54 @@ namespace FancyWM
 
         private async Task UpdateCheckLoopAsync(ReleaseChecker releaseChecker)
         {
-            while (m_checkForUpdates)
+            // 启动时延迟 3 秒，避开刚打开软件时的初始化资源竞争，确保网络完全就绪
+            await Task.Delay(TimeSpan.FromSeconds(3));
+
+            bool isFirstCheck = true;
+            while (true)
             {
-                if (ShouldCheckForUpdatesToday())
+                if (m_checkForUpdates)
                 {
-                    await CheckForUpdatesAsync(releaseChecker);
+                    await CheckForUpdatesAsync(releaseChecker, isStartupCheck: isFirstCheck);
                 }
-                await Task.Delay(TimeSpan.FromHours(3));
+
+                isFirstCheck = false;
+                await Task.Delay(TimeSpan.FromHours(6));
             }
         }
 
-        private async Task CheckForUpdatesAsync(ReleaseChecker releaseChecker)
+        private async Task CheckForUpdatesAsync(ReleaseChecker releaseChecker, bool isStartupCheck = false)
         {
             try
             {
-                var latestVersion = await releaseChecker.GetLatestStableVersionAsync("Crucialmer", "ScreenSplit");
-                var currentVersion = new Version(App.Current.VersionString);
-                if (latestVersion > currentVersion)
+                m_logger.Information("[Update] Checking for updates (startup={IsStartup})...", isStartupCheck);
+                var latestRelease = await releaseChecker.GetLatestReleaseInfoAsync("Crucialmer", "ScreenSplit");
+                if (latestRelease?.Version == null)
                 {
-                    await ShowToastAsync($"{Strings.Messages_NewerVersionAvailable}: {latestVersion}", ToastDurationLong);
+                    return;
+                }
+
+                var currentVersion = new Version(App.Current.VersionString);
+                if (latestRelease.Version > currentVersion)
+                {
+                    m_logger.Information("[Update] New version found: {Latest} (current: {Current})", latestRelease.Version, currentVersion);
+
+                    // 启动检测到新版本时，自动弹出美观的更新窗口，供用户一键下载并更新！
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        UpdateWindow.ShowUpdateDialog();
+                    });
+                }
+                else
+                {
+                    m_logger.Information("[Update] Current version {Current} is up to date.", currentVersion);
                 }
             }
             catch (Exception ex)
             {
-                m_logger.Error(ex, "Update check failed!");
+                // 静默失败（网络异常、超时或 GitHub API 速率限制），仅记录警告日志，绝不弹窗打扰用户
+                m_logger.Warning(ex, "[Update] Automatic update check failed silently");
             }
-        }
-
-        private bool ShouldCheckForUpdatesToday()
-        {
-#if DEBUG
-            return true;
-#else
-            int getBucket(int dayOfYear) => (dayOfYear * 13) % 5;
-            try
-            {
-                var installDayOfYear = File.GetCreationTime(App.Current.AppState.Settings.FullPath).DayOfYear;
-                var todayDayOfYear = DateTime.Now.DayOfYear;
-                return getBucket(installDayOfYear) == getBucket(todayDayOfYear);
-            }
-            catch
-            {
-                return true;
-            }
-#endif
         }
 
         private void OnWorkspaceUnhandledException(object sender, UnhandledExceptionEventArgs e)

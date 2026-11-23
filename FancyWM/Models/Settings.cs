@@ -96,6 +96,6 @@ namespace FancyWM.Models
 
         public bool SoundOnFailure { get; init; } = true;
 
-        public bool CheckForUpdates { get; init; } = false;
+        public bool CheckForUpdates { get; init; } = true;
     }
 }

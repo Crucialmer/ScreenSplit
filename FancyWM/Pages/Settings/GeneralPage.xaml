@@ -34,6 +34,12 @@
                     <TextBlock VerticalAlignment="Center" Text="{x:Static res:Strings.General_RunsAtStartup}" Margin="0,0,16,0" />
                 </DockPanel>
             </Border>
+            <Border Style="{DynamicResource SettingsItemStyle}">
+                <DockPanel LastChildFill="True">
+                    <CheckBox DockPanel.Dock="Right" IsChecked="{Binding Path=CheckForUpdates, Mode=TwoWay}" />
+                    <TextBlock VerticalAlignment="Center" Text="启动时自动检查更新" Margin="0,0,16,0" />
+                </DockPanel>
+            </Border>
 
             <TextBlock Text="{x:Static res:Strings.General_Displays}" Style="{DynamicResource SubtitleTextBlockStyle}" Margin="0, 20" />
 

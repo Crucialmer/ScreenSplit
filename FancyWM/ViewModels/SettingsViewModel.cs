@@ -175,6 +175,7 @@ namespace FancyWM.ViewModels
         public bool MultiMonitorSupport { get => m_multiMonitorSupport; set => SetField(ref m_multiMonitorSupport, value); }
 
         public bool SoundOnFailure { get => m_soundOnFailure; set => SetField(ref m_soundOnFailure, value); }
+        public bool CheckForUpdates { get => m_checkForUpdates; set => SetField(ref m_checkForUpdates, value); }
 
         private bool m_runsAtStartup;
         private bool m_showStartupWindow;
@@ -203,6 +204,7 @@ namespace FancyWM.ViewModels
         private bool m_multiMonitorSupport;
         private bool m_showContextHints;
         private bool m_soundOnFailure;
+        private bool m_checkForUpdates;
         private bool m_showFocus = false;
         private bool m_showFocusDuringAction;
         private readonly ILogger m_logger = App.Current.Logger;
@@ -242,6 +244,7 @@ namespace FancyWM.ViewModels
                     MultiMonitorSupport = settings.MultiMonitorSupport;
                     ShowContextHints = settings.ShowContextHints;
                     SoundOnFailure = settings.SoundOnFailure;
+                    CheckForUpdates = settings.CheckForUpdates;
                     ShowFocus = settings.ShowFocus;
                     ShowFocusDuringAction = settings.ShowFocusDuringAction;
 
@@ -376,6 +379,7 @@ namespace FancyWM.ViewModels
                     ClassIgnoreList = [.. ClassIgnoreList!],
                     MultiMonitorSupport = MultiMonitorSupport,
                     SoundOnFailure = SoundOnFailure,
+                    CheckForUpdates = CheckForUpdates,
                     ShowFocus = ShowFocus,
                     ShowFocusDuringAction = ShowFocusDuringAction
                 };
