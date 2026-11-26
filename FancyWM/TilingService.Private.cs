@@ -276,7 +276,7 @@ namespace FancyWM
                     {
                         m_logger.Debug("Updating position of window {Window}", window.WindowReference.DebugString());
                         var rect = window.ComputedRectangle;
-                        var frame = window.WindowReference.FrameMargins;
+                        var frame = GetAccurateFrameMargins(window.WindowReference);
                         var adjustedRect = new Rectangle(
                             left: rect.Left - frame.Left,
                             top: rect.Top - frame.Top,
@@ -659,6 +659,60 @@ namespace FancyWM
         private static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out RECT pvAttribute, int cbAttribute);
         private const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
 
+        [DllImport("user32.dll", EntryPoint = "SetWindowPos", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetWindowPosNative(
+            IntPtr hWnd,
+            IntPtr hWndInsertAfter,
+            int X,
+            int Y,
+            int cx,
+            int cy,
+            uint uFlags);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool IsZoomed(IntPtr hWnd);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool IsIconic(IntPtr hWnd);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool RedrawWindow(
+            IntPtr hWnd,
+            IntPtr lprcUpdate,
+            IntPtr hrgnUpdate,
+            uint flags);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern IntPtr SendMessageTimeout(
+            IntPtr hWnd,
+            uint Msg,
+            IntPtr wParam,
+            IntPtr lParam,
+            uint fuFlags,
+            uint uTimeout,
+            out IntPtr lpdwResult);
+
+        private const uint SWP_NOSIZE_FLAG = 0x0001;
+        private const uint SWP_NOMOVE_FLAG = 0x0002;
+        private const uint SWP_NOZORDER_FLAG = 0x0004;
+        private const uint SWP_NOACTIVATE_FLAG = 0x0010;
+        private const uint SWP_FRAMECHANGED_FLAG = 0x0020;
+        private const uint SWP_NOCOPYBITS_FLAG = 0x0100;
+        private const uint SWP_ASYNCWINDOWPOS_FLAG = 0x4000;
+
+        private const uint RDW_INVALIDATE_FLAG = 0x0001;
+        private const uint RDW_ERASE_FLAG = 0x0004;
+        private const uint RDW_ALLCHILDREN_FLAG = 0x0080;
+        private const uint RDW_FRAME_FLAG = 0x0400;
+
+        private const uint WM_NULL_MSG = 0x0000;
+        private const uint SMTO_NORMAL_FLAG = 0x0000;
+        private const uint SMTO_ABORTIFHUNG_FLAG = 0x0002;
+
         [DllImport("user32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool GetWindowPlacement(IntPtr hWnd, ref WINDOWPLACEMENT lpwndpl);
@@ -675,6 +729,144 @@ namespace FancyWM
 
         private static readonly ConcurrentDictionary<IntPtr, Rectangle> s_hwndFloatingMemory = new();
         private static readonly ConcurrentDictionary<string, (int Width, int Height)> s_processFloatingMemory = new();
+        private static readonly ConcurrentDictionary<IntPtr, byte> s_snappedHwnds = new();
+        private static readonly ConcurrentDictionary<IntPtr, Rectangle> s_hwndPreSnapMemory = new();
+        private static readonly ConcurrentDictionary<IntPtr, CancellationTokenSource> s_snapSettleTokens = new();
+
+        private static void CancelPendingSnapSettle(IntPtr hwnd)
+        {
+            if (hwnd != IntPtr.Zero && s_snapSettleTokens.TryRemove(hwnd, out var cts))
+            {
+                try { cts.Cancel(); } catch { }
+                try { cts.Dispose(); } catch { }
+            }
+        }
+
+        private static bool WaitForMoveSizeExit(IntPtr hwnd, uint timeoutMs = 35)
+        {
+            if (hwnd == IntPtr.Zero)
+                return false;
+
+            try
+            {
+                return SendMessageTimeout(
+                    hwnd,
+                    WM_NULL_MSG,
+                    IntPtr.Zero,
+                    IntPtr.Zero,
+                    SMTO_NORMAL_FLAG | SMTO_ABORTIFHUNG_FLAG,
+                    timeoutMs,
+                    out _) != IntPtr.Zero;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static Rectangle GetAccurateFrameMargins(IWindow window)
+        {
+            IntPtr hwnd = window.Handle;
+            if (hwnd != IntPtr.Zero && !IsZoomed(hwnd) && !IsIconic(hwnd))
+            {
+                try
+                {
+                    if (DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, out RECT visRc, Marshal.SizeOf<RECT>()) == 0 &&
+                        PInvoke.GetWindowRect(new(hwnd), out RECT rawRc) &&
+                        visRc.right > visRc.left && visRc.bottom > visRc.top &&
+                        rawRc.right > rawRc.left && rawRc.bottom > rawRc.top)
+                    {
+                        int left = Math.Max(0, visRc.left - rawRc.left);
+                        int top = Math.Max(0, visRc.top - rawRc.top);
+                        int right = Math.Max(0, rawRc.right - visRc.right);
+                        int bottom = Math.Max(0, rawRc.bottom - visRc.bottom);
+
+                        // Guard against abnormal transient values (e.g. offscreen cloaked windows)
+                        if (left <= 64 && top <= 64 && right <= 64 && bottom <= 64)
+                        {
+                            return new Rectangle(left, top, right, bottom);
+                        }
+                    }
+                }
+                catch
+                {
+                }
+            }
+
+            var fallback = window.FrameMargins;
+            return new Rectangle(
+                Math.Max(0, fallback.Left),
+                Math.Max(0, fallback.Top),
+                Math.Max(0, fallback.Right),
+                Math.Max(0, fallback.Bottom));
+        }
+
+        private static bool IsStrictlyInsideBounds(Point pt, Rectangle bounds) =>
+            pt.X >= bounds.Left && pt.X < bounds.Right && pt.Y >= bounds.Top && pt.Y < bounds.Bottom;
+
+        private static long SquaredDistanceToBounds(Point pt, Rectangle bounds)
+        {
+            long dx = 0;
+            if (pt.X < bounds.Left) dx = bounds.Left - pt.X;
+            else if (pt.X >= bounds.Right) dx = pt.X - (bounds.Right - 1);
+
+            long dy = 0;
+            if (pt.Y < bounds.Top) dy = bounds.Top - pt.Y;
+            else if (pt.Y >= bounds.Bottom) dy = pt.Y - (bounds.Bottom - 1);
+
+            return dx * dx + dy * dy;
+        }
+
+        private bool IsPointOwnedByThisDisplay(Point pt, out Point clampedPt)
+        {
+            var bounds = m_display.Bounds;
+            if (bounds.Width <= 0 || bounds.Height <= 0)
+            {
+                clampedPt = pt;
+                return false;
+            }
+
+            if (IsStrictlyInsideBounds(pt, bounds))
+            {
+                clampedPt = pt;
+                return true;
+            }
+
+            try
+            {
+                var displays = m_workspace.DisplayManager.Displays;
+                foreach (var d in displays)
+                {
+                    if (!d.Equals(m_display) && IsStrictlyInsideBounds(pt, d.Bounds))
+                    {
+                        clampedPt = pt;
+                        return false;
+                    }
+                }
+
+                long myDist = SquaredDistanceToBounds(pt, bounds);
+                foreach (var d in displays)
+                {
+                    if (!d.Equals(m_display) && d.Bounds.Width > 0 && d.Bounds.Height > 0)
+                    {
+                        long otherDist = SquaredDistanceToBounds(pt, d.Bounds);
+                        if (otherDist < myDist)
+                        {
+                            clampedPt = pt;
+                            return false;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            clampedPt = new Point(
+                Math.Clamp(pt.X, bounds.Left, bounds.Right - 1),
+                Math.Clamp(pt.Y, bounds.Top, bounds.Bottom - 1));
+            return true;
+        }
 
         private static void RecordFloatingMemory(IWindow window, Rectangle pos)
         {
@@ -982,36 +1174,144 @@ namespace FancyWM
             };
         }
 
-        private void ApplyWindowSnap(IWindow window, Rectangle targetRect)
+        private void ApplyWindowGeometryCore(IWindow window, Rectangle targetRect, bool isResponsive)
+        {
+            IntPtr hwnd = window.Handle;
+            if (hwnd == IntPtr.Zero || !window.IsAlive)
+                return;
+
+            if (IsZoomed(hwnd) || window.State != WindowState.Restored)
+            {
+                window.SetState(WindowState.Restored);
+                if (isResponsive)
+                {
+                    isResponsive = WaitForMoveSizeExit(hwnd, 30);
+                }
+            }
+
+            var frame = GetAccurateFrameMargins(window);
+            var adjustedRect = new Rectangle(
+                left: targetRect.Left - frame.Left,
+                top: targetRect.Top - frame.Top,
+                right: targetRect.Right + frame.Right,
+                bottom: targetRect.Bottom + frame.Bottom);
+
+            uint swpFlags = SWP_NOZORDER_FLAG | SWP_NOACTIVATE_FLAG | SWP_NOCOPYBITS_FLAG | SWP_FRAMECHANGED_FLAG;
+            if (!window.CanResize)
+            {
+                swpFlags |= SWP_NOSIZE_FLAG;
+            }
+            if (!window.CanMove)
+            {
+                swpFlags |= SWP_NOMOVE_FLAG;
+            }
+            if (!isResponsive)
+            {
+                swpFlags |= SWP_ASYNCWINDOWPOS_FLAG;
+            }
+
+            SetWindowPosNative(
+                hwnd,
+                IntPtr.Zero,
+                adjustedRect.Left,
+                adjustedRect.Top,
+                adjustedRect.Width,
+                adjustedRect.Height,
+                swpFlags);
+
+            RedrawWindow(
+                hwnd,
+                IntPtr.Zero,
+                IntPtr.Zero,
+                RDW_INVALIDATE_FLAG | RDW_ERASE_FLAG | RDW_FRAME_FLAG | RDW_ALLCHILDREN_FLAG);
+        }
+
+        private void ApplyWindowGeometryImmediate(IWindow window, Rectangle targetRect)
         {
             try
             {
-                var frame = window.FrameMargins;
-                var adjustedRect = new Rectangle(
-                    left: targetRect.Left - frame.Left,
-                    top: targetRect.Top - frame.Top,
-                    right: targetRect.Right + frame.Right,
-                    bottom: targetRect.Bottom + frame.Bottom);
+                IntPtr hwnd = window.Handle;
+                CancelPendingSnapSettle(hwnd);
+                bool isResponsive = WaitForMoveSizeExit(hwnd, 20);
+                ApplyWindowGeometryCore(window, targetRect, isResponsive);
+            }
+            catch (Exception ex)
+            {
+                m_logger.Warning(ex, "Failed to apply immediate window geometry for {Window}", window.DebugString());
+            }
+        }
 
-                if (window.State != WindowState.Restored)
-                {
-                    window.SetState(WindowState.Restored);
-                }
-                window.SetPosition(adjustedRect);
+        private void ApplyWindowSnap(IWindow window, Rectangle targetRect, bool isUnsnapRestore = false)
+        {
+            try
+            {
+                IntPtr hwnd = window.Handle;
+                CancelPendingSnapSettle(hwnd);
 
-                // ⭐ 强化防回弹保险：在 Windows DWM 模态拖拽循环彻底退出后（~25ms），
-                // 再次确保窗口物理位置锁定在吸附矩形，杜绝任何残余 WM_WINDOWPOSCHANGED 将窗口扯回原拖动点！
+                // 确保目标窗口已完全退出 Win32 模态拖拽循环 (WM_EXITSIZEMOVE)，
+                // 避免在 in_size_move 尚未复位时下发缩放导致内容区偏移而右上角关闭按钮停留在外框原位。
+                bool isResponsive = WaitForMoveSizeExit(hwnd, 40);
+                ApplyWindowGeometryCore(window, targetRect, isResponsive);
+
+                var cts = new CancellationTokenSource();
+                s_snapSettleTokens[hwnd] = cts;
+                var token = cts.Token;
+
+                // 二次帧同步与防回弹校准：若用户在期间开始了新拖动则立即取消；
+                // 对从分屏拖出还原的窗口强制触发 SWP_FRAMECHANGED + 子窗口重绘，彻底消除顶部/左侧空白偏移。
                 m_dispatcher.InvokeAsync(async () =>
                 {
-                    await Task.Delay(25);
                     try
                     {
-                        if (window.IsAlive)
+                        await Task.Delay(35, token);
+                        if (token.IsCancellationRequested || !window.IsAlive)
+                            return;
+
+                        if (m_movingWindow != null ||
+                            (PInvoke.GetAsyncKeyState(1) & 0x8000) != 0 ||
+                            (PInvoke.GetAsyncKeyState(2) & 0x8000) != 0)
                         {
-                            window.SetPosition(adjustedRect);
+                            return;
+                        }
+
+                        var currentVis = GetVisibleWindowRectangle(window);
+                        bool geometryDrifted = Math.Abs(currentVis.Left - targetRect.Left) > 1 ||
+                                               Math.Abs(currentVis.Top - targetRect.Top) > 1 ||
+                                               Math.Abs(currentVis.Width - targetRect.Width) > 1 ||
+                                               Math.Abs(currentVis.Height - targetRect.Height) > 1;
+
+                        bool responsiveNow = WaitForMoveSizeExit(hwnd, 25);
+                        if (geometryDrifted)
+                        {
+                            ApplyWindowGeometryCore(window, targetRect, responsiveNow);
+                        }
+                        else if (isUnsnapRestore)
+                        {
+                            uint syncFlags = SWP_NOMOVE_FLAG | SWP_NOSIZE_FLAG | SWP_NOZORDER_FLAG |
+                                             SWP_NOACTIVATE_FLAG | SWP_FRAMECHANGED_FLAG | SWP_NOCOPYBITS_FLAG;
+                            if (!responsiveNow)
+                            {
+                                syncFlags |= SWP_ASYNCWINDOWPOS_FLAG;
+                            }
+                            SetWindowPosNative(hwnd, IntPtr.Zero, 0, 0, 0, 0, syncFlags);
+                            RedrawWindow(
+                                hwnd,
+                                IntPtr.Zero,
+                                IntPtr.Zero,
+                                RDW_INVALIDATE_FLAG | RDW_ERASE_FLAG | RDW_FRAME_FLAG | RDW_ALLCHILDREN_FLAG);
                         }
                     }
-                    catch { }
+                    catch
+                    {
+                    }
+                    finally
+                    {
+                        if (s_snapSettleTokens.TryGetValue(hwnd, out var current) && ReferenceEquals(current, cts))
+                        {
+                            s_snapSettleTokens.TryRemove(hwnd, out _);
+                        }
+                        try { cts.Dispose(); } catch { }
+                    }
                 });
             }
             catch (Exception ex)
@@ -1107,15 +1407,12 @@ namespace FancyWM
             {
                 try
                 {
-                    var bounds = m_display.Bounds;
-                    var testPt = pt;
-                    // 仅当光标在屏幕边界外微小偏移时，校准回屏幕边界内
-                    if (pt.X < bounds.Left) testPt = new Point(bounds.Left, testPt.Y);
-                    if (pt.X > bounds.Right) testPt = new Point(bounds.Right, testPt.Y);
-                    if (pt.Y < bounds.Top) testPt = new Point(testPt.X, bounds.Top);
-                    if (pt.Y > bounds.Bottom) testPt = new Point(testPt.X, bounds.Bottom);
+                    if (!IsPointOwnedByThisDisplay(pt, out var testPt))
+                    {
+                        m_lastActiveSnapZone = ScreenSnapZone.None;
+                        return (null, null);
+                    }
 
-                    if (bounds.Contains(testPt))
                     {
                         var wa = m_display.WorkArea;
                         if (m_movingPanelNode == null)
@@ -1309,8 +1606,22 @@ namespace FancyWM
             }
         }
 
-        private void StartExternalDrag(IWindow window, Rectangle pos, Rectangle initialPos, Point cursor)
+        private void StartExternalDrag(IWindow window, Rectangle rawPos, Rectangle rawInitialPos, Point cursor)
         {
+            CancelPendingSnapSettle(window.Handle);
+            var pos = GetVisibleWindowRectangle(window);
+            if (pos.Width <= 0 || pos.Height <= 0)
+            {
+                pos = rawPos;
+            }
+            var initialPos = rawInitialPos;
+            if (rawInitialPos.Width > 0 && rawPos.Width > 0)
+            {
+                int dx = rawInitialPos.Left - rawPos.Left;
+                int dy = rawInitialPos.Top - rawPos.Top;
+                initialPos = Rectangle.OffsetAndSize(pos.Left + dx, pos.Top + dy, pos.Width, pos.Height);
+            }
+
             m_logger.Information("[Drag] StartExternalDrag on {Window}, Pos={Pos}, InitialPos={InitialPos}, Cursor={Cursor}",
                 window.DebugString(), pos, initialPos, cursor);
 
@@ -1343,7 +1654,8 @@ namespace FancyWM
 
             var wa = m_display.WorkArea;
             bool wasSnapped = IsWindowSnappedGeometry(pos, wa) ||
-                             (initialPos.Width > 0 && IsWindowSnappedGeometry(initialPos, wa));
+                             (initialPos.Width > 0 && IsWindowSnappedGeometry(initialPos, wa)) ||
+                             s_snappedHwnds.ContainsKey(window.Handle);
             if (!wasSnapped)
             {
                 using (m_snappedWindowsLock.EnterScope())
@@ -1355,12 +1667,15 @@ namespace FancyWM
 
             if (wasSnapped)
             {
-                var preSnapRect = GetBestFloatingRectangle(window, wa, pos);
+                if (!s_hwndPreSnapMemory.TryRemove(window.Handle, out var preSnapRect) || !IsValidFloatingRect(preSnapRect, wa))
+                {
+                    preSnapRect = GetBestFloatingRectangle(window, wa, pos);
+                }
+                s_snappedHwnds.TryRemove(window.Handle, out _);
                 m_currentDragTargetSize = new Point(preSnapRect.Width, preSnapRect.Height);
 
-                // ⭐ 核心优化：在检测到窗口从边缘拖出时，立即实时恢复其实际窗口大小！
-                // 就像 Windows 原生 Aero Snap 一样，当拖动脱离边缘时，窗口立即在物理层面缩小为原始浮动尺寸，并跟随鼠标！
-                // 这彻底消除了 Quicker 的 SWP_NOSIZE 导致窗口依然巨大并在松手时产生竞态条件的 Bug！
+                // 在检测到分屏窗口被外部拖拽工具从边缘拖出时，单次同步校准窗口实际边框与客户区大小，
+                // 避免双重冲突 SetWindowPos 或延迟回弹定时器导致客户区向下向右错位。
                 int targetW = preSnapRect.Width;
                 int targetH = preSnapRect.Height;
                 int targetX = cursor.X - (int)(targetW * m_dragGrabRatioX);
@@ -1372,12 +1687,7 @@ namespace FancyWM
                 if (targetY + targetH > wa.Bottom) targetY = wa.Bottom - targetH;
 
                 var realFloatRect = Rectangle.OffsetAndSize(targetX, targetY, targetW, targetH);
-                ApplyWindowSnap(window, realFloatRect);
-                PInvoke.SetWindowPos(
-                    new(window.Handle),
-                    new(),
-                    realFloatRect.Left, realFloatRect.Top, realFloatRect.Width, realFloatRect.Height,
-                    SetWindowPos_uFlags.SWP_NOZORDER | SetWindowPos_uFlags.SWP_NOACTIVATE);
+                ApplyWindowGeometryImmediate(window, realFloatRect);
 
                 // 保持拖出标记与原始大小记录，供后续自由释放或重新贴靠使用
                 using (m_snappedWindowsLock.EnterScope())
@@ -2200,7 +2510,10 @@ namespace FancyWM
             m_logger.Information("Window {Window} removed from workspace", e.Source.DebugString());
 
             UnbindEventHandlers(e.Source);
+            CancelPendingSnapSettle(e.Source.Handle);
             s_hwndFloatingMemory.TryRemove(e.Source.Handle, out _);
+            s_snappedHwnds.TryRemove(e.Source.Handle, out _);
+            s_hwndPreSnapMemory.TryRemove(e.Source.Handle, out _);
             if (Equals(m_movingWindow, e.Source))
             {
                 m_movingWindow = null;
@@ -2253,14 +2566,24 @@ namespace FancyWM
         private void DoWindowMove(IWindow window)
         {
             var pt = m_workspace.CursorLocation;
-            var bounds = m_display.Bounds;
-            var testPt = pt;
-            if (pt.X < bounds.Left) testPt = new Point(bounds.Left, testPt.Y);
-            if (pt.X > bounds.Right) testPt = new Point(bounds.Right, testPt.Y);
-            if (pt.Y < bounds.Top) testPt = new Point(testPt.X, bounds.Top);
-            if (pt.Y > bounds.Bottom) testPt = new Point(testPt.X, bounds.Bottom);
+            if (!IsPointOwnedByThisDisplay(pt, out var testPt))
+            {
+                m_lastActiveSnapZone = ScreenSnapZone.None;
+                using (m_preSnapRectanglesLock.EnterScope())
+                {
+                    m_preSnapRectangles.Remove(window);
+                    m_activeDragOriginalRect.Remove(window);
+                    m_activeDragInitialRawRect.Remove(window);
+                }
+                using (m_snappedWindowsLock.EnterScope())
+                {
+                    m_snappedWindows.Remove(window);
+                }
+                return;
+            }
+
             var wa = m_display.WorkArea;
-            var snapZone = bounds.Contains(testPt) ? GetSnapZone(testPt, wa) : ScreenSnapZone.None;
+            var snapZone = GetSnapZone(testPt, wa);
 
             // ⭐ 核心优化：防微震颤与松手竞态记忆
             // 若松手瞬间鼠标由于物理按键回弹微颤移出了边缘，但用户在过去 400ms 内正处于预览贴靠区（尤其是 1/4 角落区），
@@ -2293,9 +2616,11 @@ namespace FancyWM
                     using (m_preSnapRectanglesLock.EnterScope())
                     {
                         if (m_activeDragOriginalRect.TryGetValue(window, out var origDragRect) &&
-                            IsValidFloatingRect(origDragRect, wa))
+                            IsValidFloatingRect(origDragRect, wa) &&
+                            !s_snappedHwnds.ContainsKey(window.Handle))
                         {
                             m_preSnapRectangles[window] = origDragRect;
+                            s_hwndPreSnapMemory[window.Handle] = origDragRect;
                             using (m_lastFloatingRectanglesLock.EnterScope())
                             {
                                 m_lastFloatingRectangles[window] = origDragRect;
@@ -2307,8 +2632,13 @@ namespace FancyWM
                         else if (!m_preSnapRectangles.ContainsKey(window) ||
                                  IsWindowSnappedGeometry(m_preSnapRectangles[window], wa))
                         {
-                            var bestFloat = GetBestFloatingRectangle(window, wa, GetVisibleWindowRectangle(window));
+                            if (!s_hwndPreSnapMemory.TryGetValue(window.Handle, out var bestFloat) ||
+                                !IsValidFloatingRect(bestFloat, wa))
+                            {
+                                bestFloat = GetBestFloatingRectangle(window, wa, GetVisibleWindowRectangle(window));
+                            }
                             m_preSnapRectangles[window] = bestFloat;
+                            s_hwndPreSnapMemory[window.Handle] = bestFloat;
                             using (m_lastFloatingRectanglesLock.EnterScope())
                             {
                                 m_lastFloatingRectangles[window] = bestFloat;
@@ -2317,6 +2647,7 @@ namespace FancyWM
                         }
                     }
 
+                    s_snappedHwnds[window.Handle] = 1;
                     using (m_snappedWindowsLock.EnterScope())
                     {
                         m_snappedWindows.Add(window);
@@ -2334,7 +2665,7 @@ namespace FancyWM
                         m_floatingSet.Add(window);
                     }
 
-                    ApplyWindowSnap(window, targetRect.Value);
+                    ApplyWindowSnap(window, targetRect.Value, isUnsnapRestore: false);
                     InvalidateLayout();
                     return;
                 }
@@ -2354,12 +2685,19 @@ namespace FancyWM
                 m_activeDragInitialRawRect.Remove(window);
             }
 
+            bool wasGloballySnapped = s_snappedHwnds.TryRemove(window.Handle, out _);
+            if (s_hwndPreSnapMemory.TryRemove(window.Handle, out var globalPreSnap) && !hadPreSnap)
+            {
+                preSnapRect = globalPreSnap;
+                hadPreSnap = true;
+            }
+
             using (m_snappedWindowsLock.EnterScope())
             {
                 m_snappedWindows.Remove(window);
             }
 
-            if (!hadPreSnap && m_isDraggingSnappedWindow)
+            if (!hadPreSnap && (m_isDraggingSnappedWindow || wasGloballySnapped))
             {
                 preSnapRect = GetBestFloatingRectangle(window, wa, GetVisibleWindowRectangle(window));
                 hadPreSnap = true;
@@ -2369,6 +2707,9 @@ namespace FancyWM
             {
                 m_logger.Information("Window {Window} dragged away from edge/corner, restoring pre-snap rectangle {Rect}",
                     window.DebugString(), preSnapRect);
+
+                // 先等待 Win32 拖拽循环完全落定，确保读取到的 curPos 是松手后的最终真实可视位置
+                WaitForMoveSizeExit(window.Handle, 35);
 
                 int targetW = preSnapRect.Width;
                 int targetH = preSnapRect.Height;
@@ -2424,7 +2765,7 @@ namespace FancyWM
                 if (targetY < wa.Top) targetY = wa.Top;
 
                 var restoredRect = Rectangle.OffsetAndSize(targetX, targetY, targetW, targetH);
-                ApplyWindowSnap(window, restoredRect);
+                ApplyWindowSnap(window, restoredRect, isUnsnapRestore: true);
 
                 // 持续保留该真实浮动大小记忆，供后续再次贴靠或拖出使用
                 using (m_lastFloatingRectanglesLock.EnterScope())
@@ -2564,38 +2905,41 @@ namespace FancyWM
                     if (m_currentInteraction == UserInteraction.None && m_movingWindow == null && isLeftButtonDown)
                     {
                         var cursor = m_workspace.CursorLocation;
-                        bool isSizePreservedExternal = Math.Abs(e.OldPosition.Width - e.NewPosition.Width) <= 10 &&
-                                                       Math.Abs(e.OldPosition.Height - e.NewPosition.Height) <= 10;
-                        int winDx = e.NewPosition.Left - e.OldPosition.Left;
-                        int winDy = e.NewPosition.Top - e.OldPosition.Top;
-                        bool isPositionChanged = (winDx != 0 || winDy != 0);
-
-                        // Cursor is inside or very close to the moving window
-                        bool isCursorInsideWindow = cursor.X >= e.NewPosition.Left - 80 &&
-                                                    cursor.X <= e.NewPosition.Right + 80 &&
-                                                    cursor.Y >= e.NewPosition.Top - 80 &&
-                                                    cursor.Y <= e.NewPosition.Bottom + 80;
-
-                        if (isSizePreservedExternal && isPositionChanged && isCursorInsideWindow)
+                        if (IsPointOwnedByThisDisplay(cursor, out _))
                         {
-                            if (Equals(m_potentialExternalDragWindow, e.Source) && (m_sw.Elapsed - m_lastExternalDragTime) <= TimeSpan.FromMilliseconds(250))
-                            {
-                                m_externalDragFrameCount++;
-                                m_lastExternalDragTime = m_sw.Elapsed;
+                            bool isSizePreservedExternal = Math.Abs(e.OldPosition.Width - e.NewPosition.Width) <= 10 &&
+                                                           Math.Abs(e.OldPosition.Height - e.NewPosition.Height) <= 10;
+                            int winDx = e.NewPosition.Left - e.OldPosition.Left;
+                            int winDy = e.NewPosition.Top - e.OldPosition.Top;
+                            bool isPositionChanged = (winDx != 0 || winDy != 0);
 
-                                if (m_externalDragFrameCount >= 2)
-                                {
-                                    // Confirmed external drag!
-                                    StartExternalDrag(e.Source, e.NewPosition, m_potentialExternalDragInitialPos, cursor);
-                                    return;
-                                }
-                            }
-                            else
+                            // Cursor is inside or very close to the moving window
+                            bool isCursorInsideWindow = cursor.X >= e.NewPosition.Left - 80 &&
+                                                        cursor.X <= e.NewPosition.Right + 80 &&
+                                                        cursor.Y >= e.NewPosition.Top - 80 &&
+                                                        cursor.Y <= e.NewPosition.Bottom + 80;
+
+                            if (isSizePreservedExternal && isPositionChanged && isCursorInsideWindow)
                             {
-                                m_potentialExternalDragWindow = e.Source;
-                                m_potentialExternalDragInitialPos = e.OldPosition;
-                                m_externalDragFrameCount = 1;
-                                m_lastExternalDragTime = m_sw.Elapsed;
+                                if (Equals(m_potentialExternalDragWindow, e.Source) && (m_sw.Elapsed - m_lastExternalDragTime) <= TimeSpan.FromMilliseconds(250))
+                                {
+                                    m_externalDragFrameCount++;
+                                    m_lastExternalDragTime = m_sw.Elapsed;
+
+                                    if (m_externalDragFrameCount >= 2)
+                                    {
+                                        // Confirmed external drag!
+                                        StartExternalDrag(e.Source, e.NewPosition, m_potentialExternalDragInitialPos, cursor);
+                                        return;
+                                    }
+                                }
+                                else
+                                {
+                                    m_potentialExternalDragWindow = e.Source;
+                                    m_potentialExternalDragInitialPos = e.OldPosition;
+                                    m_externalDragFrameCount = 1;
+                                    m_lastExternalDragTime = m_sw.Elapsed;
+                                }
                             }
                         }
                     }
@@ -2625,11 +2969,17 @@ namespace FancyWM
                 m_lastExternalDragTime = m_sw.Elapsed;
             }
 
-            // 实时记录正常浮动窗口的尺寸与位置，防止窗口在各种方式贴靠后丢失记忆
+            // 实时记录正常浮动窗口的可视尺寸与位置（统一使用 DWM 可视矩形，避免混入隐形阴影边框）
             var curWa = m_display.WorkArea;
-            var curPos = e.NewPosition;
-            if (IsValidFloatingRect(curPos, curWa) &&
+            var curPos = GetVisibleWindowRectangle(e.Source);
+            if (curPos.Width <= 0 || curPos.Height <= 0)
+            {
+                curPos = e.NewPosition;
+            }
+            if (IsPointOwnedByThisDisplay(curPos.Center, out _) &&
+                IsValidFloatingRect(curPos, curWa) &&
                 !IsWindowSnapped(e.Source, curPos, curWa) &&
+                !s_snappedHwnds.ContainsKey(e.Source.Handle) &&
                 !m_isDraggingSnappedWindow)
             {
                 using (m_lastFloatingRectanglesLock.EnterScope())
@@ -2948,6 +3298,8 @@ namespace FancyWM
             if (!m_active)
                 return;
 
+            CancelPendingSnapSettle(e.Source.Handle);
+
             using (m_ignoreRepositionSetLock.EnterScope())
             {
                 m_ignoreRepositionSet.Add(e.Source);
@@ -2962,13 +3314,18 @@ namespace FancyWM
             {
                 startPos = rawStartPos;
             }
+            bool belongsToThisDisplay = IsPointOwnedByThisDisplay(cursor, out _) ||
+                                        IsPointOwnedByThisDisplay(startPos.Center, out _);
 
             // 始终记录初始 raw 物理位置供尺寸形变比对（与 e.NewPosition 处于完全相同的坐标系，绝无 DWM 边框差值！）
-            // 同时记录 startPos 供贴靠窗口还原记忆
+            // 同时仅在所属显示器上记录 startPos 供贴靠窗口还原记忆
             using (m_preSnapRectanglesLock.EnterScope())
             {
                 m_activeDragInitialRawRect[e.Source] = rawStartPos;
-                m_activeDragOriginalRect[e.Source] = startPos;
+                if (belongsToThisDisplay)
+                {
+                    m_activeDragOriginalRect[e.Source] = startPos;
+                }
             }
 
             double scale = m_display.Scaling > 0 ? m_display.Scaling : 1.0;
@@ -3008,51 +3365,67 @@ namespace FancyWM
             }
 
             var wa = m_display.WorkArea;
-            bool wasSnapped = IsWindowSnappedGeometry(startPos, wa);
-            if (!wasSnapped)
+            bool wasSnapped = false;
+            if (belongsToThisDisplay)
             {
-                using (m_snappedWindowsLock.EnterScope())
+                wasSnapped = IsWindowSnappedGeometry(startPos, wa) || s_snappedHwnds.ContainsKey(e.Source.Handle);
+                if (!wasSnapped)
                 {
-                    if (m_snappedWindows.Contains(e.Source) && (startPos.Width >= wa.Width * 0.45 || startPos.Height >= wa.Height * 0.45))
+                    using (m_snappedWindowsLock.EnterScope())
+                    {
+                        if (m_snappedWindows.Contains(e.Source) && (startPos.Width >= wa.Width * 0.45 || startPos.Height >= wa.Height * 0.45))
+                            wasSnapped = true;
+                    }
+                }
+                if (!wasSnapped)
+                {
+                    if (e.Source.State == WindowState.Maximized ||
+                        (startPos.Width >= wa.Width - 20 && startPos.Height >= wa.Height - 20))
+                    {
                         wasSnapped = true;
+                    }
                 }
             }
-            if (!wasSnapped)
+            else
             {
-                if (e.Source.State == WindowState.Maximized ||
-                    (startPos.Width >= wa.Width - 20 && startPos.Height >= wa.Height - 20))
-                {
-                    wasSnapped = true;
-                }
+                wasSnapped = s_snappedHwnds.ContainsKey(e.Source.Handle);
             }
 
             if (wasSnapped)
             {
                 m_isDraggingSnappedWindow = true;
-                using (m_snappedWindowsLock.EnterScope())
+                if (belongsToThisDisplay)
                 {
-                    m_snappedWindows.Add(e.Source);
+                    s_snappedHwnds[e.Source.Handle] = 1;
+                    using (m_snappedWindowsLock.EnterScope())
+                    {
+                        m_snappedWindows.Add(e.Source);
+                    }
+                    var preSnapRect = GetBestFloatingRectangle(e.Source, wa, startPos);
+                    s_hwndPreSnapMemory[e.Source.Handle] = preSnapRect;
+                    using (m_preSnapRectanglesLock.EnterScope())
+                    {
+                        m_preSnapRectangles[e.Source] = preSnapRect;
+                    }
+                    m_currentDragTargetSize = new WinMan.Point(preSnapRect.Width, preSnapRect.Height);
                 }
-                var preSnapRect = GetBestFloatingRectangle(e.Source, wa, startPos);
-                using (m_preSnapRectanglesLock.EnterScope())
-                {
-                    m_preSnapRectangles[e.Source] = preSnapRect;
-                }
-                m_currentDragTargetSize = new WinMan.Point(preSnapRect.Width, preSnapRect.Height);
             }
             else
             {
                 m_isDraggingSnappedWindow = false;
-                using (m_lastFloatingRectanglesLock.EnterScope())
+                if (belongsToThisDisplay)
                 {
+                    using (m_lastFloatingRectanglesLock.EnterScope())
+                    {
+                        if (IsValidFloatingRect(startPos, wa))
+                        {
+                            m_lastFloatingRectangles[e.Source] = startPos;
+                        }
+                    }
                     if (IsValidFloatingRect(startPos, wa))
                     {
-                        m_lastFloatingRectangles[e.Source] = startPos;
+                        RecordFloatingMemory(e.Source, startPos);
                     }
-                }
-                if (IsValidFloatingRect(startPos, wa))
-                {
-                    RecordFloatingMemory(e.Source, startPos);
                 }
                 m_currentDragTargetSize = new WinMan.Point(startPos.Width, startPos.Height);
             }

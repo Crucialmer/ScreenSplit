@@ -69,7 +69,7 @@ namespace FancyWM.Windows
             else
             {
                 m_releaseChecker = new ReleaseChecker();
-                m_currentVersion = new Version(1, 0, 35);
+                m_currentVersion = new Version(1, 0, 36);
             }
 
             AppHeroIcon.Source = LiquidGlassTheme.GetAppIconImage();
