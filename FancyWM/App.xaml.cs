@@ -64,6 +64,40 @@ namespace FancyWM
             }
         }
 
+        public static string DisplayVersion { get; } = ResolveDisplayVersion();
+        public static string VersionTagText => $"v{DisplayVersion}";
+        public static string TrayTitleText => $"ScreenSplit  v{DisplayVersion}";
+        public static string SidebarVersionText => $"v{DisplayVersion} · 纯绿色便携";
+        public static string StartupBadgeText => $"v{DisplayVersion} 正式版";
+        public static string AboutVersionText => $"版本 {DisplayVersion} · 纯绿色便携分屏工具";
+
+        public static Version NormalizedVersion { get; } = ParseNormalizedVersion(DisplayVersion);
+
+        private static string ResolveDisplayVersion()
+        {
+            var infoAttr = typeof(App).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
+            if (!string.IsNullOrWhiteSpace(infoAttr?.InformationalVersion))
+            {
+                return infoAttr.InformationalVersion.Split('+')[0].TrimStart('v', 'V');
+            }
+            var asmVer = typeof(App).Assembly.GetName().Version;
+            if (asmVer != null)
+            {
+                return $"{asmVer.Major}.{asmVer.Minor}.{Math.Max(0, asmVer.Build)}";
+            }
+            return "1.0.35";
+        }
+
+        private static Version ParseNormalizedVersion(string versionText)
+        {
+            var clean = versionText.TrimStart('v', 'V').Split('-')[0];
+            if (Version.TryParse(clean, out var parsed))
+            {
+                return new Version(parsed.Major, parsed.Minor, Math.Max(0, parsed.Build));
+            }
+            return new Version(1, 0, 35);
+        }
+
         internal string VersionString
         {
             get
@@ -77,9 +111,7 @@ namespace FancyWM
                 }
                 catch (Exception)
                 {
-                    var path = Environment.ProcessPath ?? Assembly.GetEntryAssembly()?.Location;
-                    var versionInfo = !string.IsNullOrEmpty(path) ? FileVersionInfo.GetVersionInfo(path) : null;
-                    return versionInfo?.FileVersion ?? "1.0.34.0";
+                    return $"{DisplayVersion}.0";
                 }
             }
         }
@@ -127,6 +159,7 @@ namespace FancyWM
                 Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri($"/{asm};component/Themes/Fluent/Squared.xaml", UriKind.RelativeOrAbsolute) });
             }
             Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri($"/{asm};component/Themes/Fluent/Generic.xaml", UriKind.RelativeOrAbsolute) });
+            LiquidGlassTheme.Initialize();
 
             if (e.Args != null && (e.Args.Contains("--update") || e.Args.Contains("--check-updates")))
             {

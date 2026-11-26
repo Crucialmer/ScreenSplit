@@ -142,7 +142,12 @@ namespace FancyWM
         }
 
         private static readonly IReadOnlySet<IWindow> EmptyWindowSet = new HashSet<IWindow>();
+#if DEBUG
         private static readonly TimeSpan LockThreshold = TimeSpan.FromMilliseconds(10);
+        private static Lock CreateLock() => new(LockThreshold);
+#else
+        private static Lock CreateLock() => new();
+#endif
 
         /// <summary>
         /// The dispatcher from the thread that created the <see cref="TilingService"/>
@@ -156,31 +161,33 @@ namespace FancyWM
         private readonly IDisplay m_display;
 
         private readonly TilingWorkspace m_backend;
-        private readonly Utilities.DebugLock m_backendLock = new(LockThreshold);
+        private readonly Lock m_backendLock = CreateLock();
 
         private readonly HashSet<IWindow> m_newWindowSet = [];
-        private readonly Utilities.DebugLock m_newWindowSetLock = new(LockThreshold);
+        private readonly Lock m_newWindowSetLock = CreateLock();
 
         private readonly HashSet<IWindow> m_windowSet = [];
-        private readonly Utilities.DebugLock m_windowSetLock = new(LockThreshold);
+        private readonly Lock m_windowSetLock = CreateLock();
 
         private readonly HashSet<IWindow> m_floatingSet = [];
-        private readonly Utilities.DebugLock m_floatingSetLock = new(LockThreshold);
+        private readonly Lock m_floatingSetLock = CreateLock();
 
         private readonly HashSet<IWindow> m_ignoreRepositionSet = [];
-        private readonly Utilities.DebugLock m_ignoreRepositionSetLock = new(LockThreshold);
+        private readonly Lock m_ignoreRepositionSetLock = CreateLock();
 
         private readonly Dictionary<IWindow, NodeLocation> m_savedLocations = [];
-        private readonly Utilities.DebugLock m_savedLocationsLock = new(LockThreshold);
+        private readonly Lock m_savedLocationsLock = CreateLock();
 
         private readonly Dictionary<IWindow, Rectangle> m_preSnapRectangles = [];
         private readonly Dictionary<IWindow, Rectangle> m_activeDragOriginalRect = [];
         private readonly Dictionary<IWindow, Rectangle> m_activeDragInitialRawRect = [];
-        private readonly Utilities.DebugLock m_preSnapRectanglesLock = new(LockThreshold);
+        private readonly Lock m_preSnapRectanglesLock = CreateLock();
         private readonly HashSet<IWindow> m_snappedWindows = [];
-        private readonly Utilities.DebugLock m_snappedWindowsLock = new(LockThreshold);
+        private readonly Lock m_snappedWindowsLock = CreateLock();
         private readonly Dictionary<IWindow, Rectangle> m_lastFloatingRectangles = [];
-        private readonly Utilities.DebugLock m_lastFloatingRectanglesLock = new(LockThreshold);
+        private readonly Lock m_lastFloatingRectanglesLock = CreateLock();
+        private Rectangle? m_lastPreviewRect;
+        private string? m_lastPreviewTitle;
         private double m_dragGrabRatioX = 0.5;
         private double m_dragGrabRatioY = 0.1;
         private IWindow? m_movingWindow;

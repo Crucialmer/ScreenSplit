@@ -10,6 +10,8 @@
              mc:Ignorable="d"
              IsHitTestVisible="False"
              UseLayoutRounding="True"
+             TextOptions.TextFormattingMode="Display"
+             TextOptions.TextRenderingMode="ClearType"
              d:DesignHeight="450" d:DesignWidth="800">
     <Canvas>
         <Rectangle
@@ -50,35 +52,69 @@
             </Rectangle.Style>
         </Rectangle>
 
+        <!-- macOS 26 Tahoe Liquid Glass Snap Preview Sheet -->
         <Border
             x:Name="PreviewBorder"
             BorderBrush="{theme:CssResource panel.preview/border-color}"
-            BorderThickness="{theme:CssResource panel.preview/border-width}"
-            CornerRadius="10"
+            BorderThickness="1.5"
+            CornerRadius="18"
             Background="{theme:CssResource panel.preview/background}"
             Width="{Binding PreviewRectangle.Width}"
             Height="{Binding PreviewRectangle.Height}"
             Canvas.Left="{Binding PreviewRectangle.Left}"
             Canvas.Top="{Binding PreviewRectangle.Top}"
-            Visibility="{Binding PreviewVisibility}">
+            Visibility="{Binding PreviewVisibility}"
+            SnapsToDevicePixels="True">
             <Border.Effect>
-                <DropShadowEffect BlurRadius="24" ShadowDepth="4" Direction="270" Color="#000000" Opacity="0.55" />
+                <DropShadowEffect BlurRadius="28" ShadowDepth="4" Direction="270" Color="#000000" Opacity="0.34" />
             </Border.Effect>
             <Grid>
-                <!-- Subtle dark shadow tint layer to clearly show original size state -->
-                <Border CornerRadius="8" Background="#30000000" Margin="1" />
+                <!-- Anisotropic Specular Rim Inner Catchlight (macOS 26 Liquid Glass Optical Edge) -->
+                <Border CornerRadius="16.5" BorderThickness="1" IsHitTestVisible="False">
+                    <Border.BorderBrush>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#99FFFFFF" Offset="0" />
+                            <GradientStop Color="#28FFFFFF" Offset="0.45" />
+                            <GradientStop Color="#14FFFFFF" Offset="1" />
+                        </LinearGradientBrush>
+                    </Border.BorderBrush>
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
+                            <GradientStop Color="#2EFFFFFF" Offset="0" />
+                            <GradientStop Color="#0DFFFFFF" Offset="0.28" />
+                            <GradientStop Color="#12000000" Offset="1" />
+                        </LinearGradientBrush>
+                    </Border.Background>
+                </Border>
 
-                <!-- Centered indicator badge -->
-                <Border HorizontalAlignment="Center" VerticalAlignment="Center"
-                        Background="#D9181818" CornerRadius="14" Padding="14,7"
-                        BorderBrush="{theme:CssResource panel.preview/border-color}" BorderThickness="1.2"
-                        Visibility="{Binding PreviewTitleVisibility}">
+                <!-- Centered macOS 26 Floating Liquid Glass Indicator Pill -->
+                <Border HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Background="{DynamicResource LiquidGlassOverlayPillBg}"
+                        BorderBrush="{DynamicResource LiquidGlassOverlayPillBorder}"
+                        BorderThickness="1"
+                        CornerRadius="20"
+                        Padding="18,9"
+                        Visibility="{Binding PreviewTitleVisibility}"
+                        SnapsToDevicePixels="True">
                     <Border.Effect>
-                        <DropShadowEffect BlurRadius="12" ShadowDepth="2" Direction="270" Color="#000000" Opacity="0.5" />
+                        <DropShadowEffect BlurRadius="18" ShadowDepth="4" Direction="270" Color="#000000" Opacity="0.32" />
                     </Border.Effect>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="&#xE777;" FontFamily="Segoe MDL2 Assets" Foreground="White" FontSize="13" VerticalAlignment="Center" Margin="0,0,8,0" />
-                        <TextBlock Text="{Binding PreviewTitle}" Foreground="White" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <Border Width="22" Height="22" CornerRadius="11" Background="{DynamicResource LiquidGlassAccentTintBg}" Margin="0,0,9,0" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE737;"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       Foreground="{DynamicResource LiquidGlassAccentBrush}"
+                                       FontSize="11.5"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="{Binding PreviewTitle}"
+                                   FontFamily="Segoe UI Variable Text, -apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei UI"
+                                   Foreground="{DynamicResource LiquidGlassOverlayPillFg}"
+                                   FontSize="13.5"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center" />
                     </StackPanel>
                 </Border>
             </Grid>

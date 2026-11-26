@@ -3,98 +3,102 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:local="clr-namespace:FancyWM.Pages.Settings"
              xmlns:ui="http://schemas.modernwpf.com/2019"
-             xmlns:controls="clr-namespace:FancyWM.Controls"
-             xmlns:res="clr-namespace:FancyWM.Resources"
              xmlns:viewmodels="clr-namespace:FancyWM.ViewModels"
              d:DataContext="{d:DesignInstance Type=viewmodels:SettingsViewModel}"
              mc:Ignorable="d"
              d:DesignHeight="700" d:DesignWidth="800">
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" MaxWidth="900"/>
+            <ColumnDefinition Width="*" MaxWidth="820" />
         </Grid.ColumnDefinitions>
-        <ui:SimpleStackPanel Margin="0,0,0,32" Spacing="16">
-            <!-- Hero Header -->
-            <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
-                    BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+        <StackPanel Orientation="Vertical" Margin="0,0,0,24">
+            <!-- macOS 26 Liquid Glass Hero Banner -->
+            <Border Background="{DynamicResource LiquidGlassCardBg}"
+                    BorderBrush="{DynamicResource LiquidGlassCardBorder}"
                     BorderThickness="1"
-                    CornerRadius="12"
-                    Padding="20,18"
-                    Margin="0,0,0,8">
+                    CornerRadius="16"
+                    Padding="20,16"
+                    Margin="0,0,0,4">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Width="48" Height="48" CornerRadius="12" Background="#007AFF" Margin="0,0,16,0">
+                    <Border Width="48" Height="48" CornerRadius="12" Margin="0,0,15,0">
                         <Border.Effect>
-                            <DropShadowEffect BlurRadius="10" ShadowDepth="3" Direction="270" Opacity="0.3" Color="#007AFF" />
+                            <DropShadowEffect BlurRadius="12" ShadowDepth="3" Direction="270" Opacity="0.24" Color="#000000" />
                         </Border.Effect>
-                        <Image Source="/Resources/Icon.ico" Width="34" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <Image Source="/Icon.png" Width="48" Height="48" Stretch="Uniform" />
                     </Border>
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="ScreenSplit 便携分屏使用指南" FontWeight="SemiBold" FontSize="18" Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}" />
-                        <TextBlock Text="纯鼠标直觉交互 · 边缘智能吸附 · 零多余按键 · 极致轻盈" FontSize="12.5" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,4,0,0" />
+                        <TextBlock Text="ScreenSplit 便携分屏使用指南"
+                                   FontFamily="Segoe UI Variable Display, -apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei UI"
+                                   FontWeight="SemiBold"
+                                   FontSize="18.5"
+                                   Foreground="{DynamicResource LiquidGlassPrimaryFg}" />
+                        <TextBlock Text="纯鼠标直觉交互 · 边缘与顶角精准吸附 · 240Hz 液态玻璃流畅体验"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource LiquidGlassSecondaryFg}"
+                                   Margin="0,4,0,0" />
                     </StackPanel>
                 </StackPanel>
             </Border>
 
             <!-- Edge & Corner Snapping Card -->
-            <TextBlock Text="边缘与角落智能停靠（纯鼠标拖拽）" Style="{DynamicResource SubtitleTextBlockStyle}" Margin="2,12,0,4" />
-            <Border Style="{DynamicResource SettingsItemStyle}">
-                <ui:SimpleStackPanel Spacing="12">
-                    <DockPanel LastChildFill="True">
-                        <Border Background="#007AFF" CornerRadius="6" Width="26" Height="26" Margin="0,0,12,0">
-                            <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE737;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <TextBlock Text="边缘与顶角智能停靠（纯鼠标拖拽）" Style="{DynamicResource MacSectionHeaderStyle}" />
+            <Border Style="{DynamicResource MacGroupedCardStyle}">
+                <StackPanel Orientation="Vertical">
+                    <DockPanel LastChildFill="True" Margin="18,14">
+                        <Border DockPanel.Dock="Left" Background="#007AFF" CornerRadius="8" Width="30" Height="30" Margin="0,0,14,0" VerticalAlignment="Center">
+                            <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE737;" Foreground="White" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="四周边缘停靠（二分之一分屏）" FontWeight="Medium" FontSize="13.5" />
-                            <TextBlock Text="拖拽窗口至屏幕左、右、上、下任意边缘，即刻触发半透明高亮预览；松开鼠标窗口自动精准占用对应半屏（左半屏、右半屏、上半屏、下半屏）。" TextWrapping="Wrap" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,3,0,0" />
+                            <TextBlock Text="四周边缘停靠（二分之一分屏）" FontWeight="SemiBold" FontSize="13.5" Foreground="{DynamicResource LiquidGlassPrimaryFg}" />
+                            <TextBlock Text="拖拽窗口至屏幕左、右、上、下最外侧物理边缘，即刻触发 macOS 26 液态玻璃高亮预览；松开鼠标窗口自动精准占用对应半屏。" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource LiquidGlassSecondaryFg}" Margin="0,3,0,0" />
                         </StackPanel>
                     </DockPanel>
 
-                    <Rectangle Height="1" Fill="{DynamicResource SystemControlForegroundBaseLowBrush}" Opacity="0.3" />
+                    <Rectangle Style="{DynamicResource MacHairlineDividerStyle}" />
 
-                    <DockPanel LastChildFill="True">
-                        <Border Background="#34C759" CornerRadius="6" Width="26" Height="26" Margin="0,0,12,0">
-                            <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE784;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <DockPanel LastChildFill="True" Margin="18,14">
+                        <Border DockPanel.Dock="Left" Background="#34C759" CornerRadius="8" Width="30" Height="30" Margin="0,0,14,0" VerticalAlignment="Center">
+                            <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE784;" Foreground="White" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="四角精细停靠（四分之一分屏）" FontWeight="Medium" FontSize="13.5" />
-                            <TextBlock Text="拖拽窗口至屏幕左上角、右上角、左下角、右下角任意角落，松开鼠标窗口自动占用屏幕的四分之一，多任务并排更省心。" TextWrapping="Wrap" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,3,0,0" />
+                            <TextBlock Text="四个顶角精细停靠（四分之一分屏）" FontWeight="SemiBold" FontSize="13.5" Foreground="{DynamicResource LiquidGlassPrimaryFg}" />
+                            <TextBlock Text="拖拽窗口至屏幕左上、右上、左下、右下任意最顶点，松开鼠标窗口自动精准占用四分之一屏幕，多任务并排更省心。" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource LiquidGlassSecondaryFg}" Margin="0,3,0,0" />
                         </StackPanel>
                     </DockPanel>
 
-                    <Rectangle Height="1" Fill="{DynamicResource SystemControlForegroundBaseLowBrush}" Opacity="0.3" />
+                    <Rectangle Style="{DynamicResource MacHairlineDividerStyle}" />
 
-                    <DockPanel LastChildFill="True">
-                        <Border Background="#FF9500" CornerRadius="6" Width="26" Height="26" Margin="0,0,12,0">
-                            <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE777;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <DockPanel LastChildFill="True" Margin="18,14">
+                        <Border DockPanel.Dock="Left" Background="#FF9500" CornerRadius="8" Width="30" Height="30" Margin="0,0,14,0" VerticalAlignment="Center">
+                            <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE777;" Foreground="White" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="拖离边缘轮廓跟随与尺寸还原" FontWeight="Medium" FontSize="13.5" />
-                            <TextBlock Text="按住标题栏拖动已停靠边缘的窗口，在移动时半透明原始尺寸轮廓实时跟随光标，所见即所得；松开鼠标窗口立即平滑就位恢复停靠前的原始尺寸与状态。" TextWrapping="Wrap" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,3,0,0" />
+                            <TextBlock Text="拖离边缘落点绝对锚定与原始尺寸记忆" FontWeight="SemiBold" FontSize="13.5" Foreground="{DynamicResource LiquidGlassPrimaryFg}" />
+                            <TextBlock Text="按住标题栏将已停靠窗口拖离至自由空间并松开，窗口以实际拖放落点为绝对基准零跳动平滑恢复停靠前的原始尺寸与纵横比。" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource LiquidGlassSecondaryFg}" Margin="0,3,0,0" />
                         </StackPanel>
                     </DockPanel>
-                </ui:SimpleStackPanel>
+                </StackPanel>
             </Border>
 
-            <!-- Free Floating & Snapping Card -->
-            <TextBlock Text="纯自由浮动与多显示器适配" Style="{DynamicResource SubtitleTextBlockStyle}" Margin="2,12,0,4" />
-            <Border Style="{DynamicResource SettingsItemStyle}">
-                <ui:SimpleStackPanel Spacing="10">
-                    <TextBlock Text="• 自由浮动模式：所有窗口默认保持自由浮动，无任何强制切分区打扰，彻底摆脱传统平铺窗口管理器的复杂束缚。" TextWrapping="Wrap" FontWeight="Medium" />
-                    <TextBlock Text="• 纯鼠标直觉交互：拖动窗口至四周边缘吸附为半屏，拖动至四个角落吸附为四分之一屏；离开边缘松开即刻还原原始尺寸。" TextWrapping="Wrap" FontWeight="Medium" />
-                    <TextBlock Text="• 多显示器独立吸附：无论主副屏幕，均可在任意显示器边缘与四角自由吸附与跨屏放置。" TextWrapping="Wrap" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" />
+            <!-- Free Floating & Multi-Monitor -->
+            <TextBlock Text="纯自由浮动与多显示器适配" Style="{DynamicResource MacSectionHeaderStyle}" />
+            <Border Style="{DynamicResource MacGroupedCardStyle}">
+                <ui:SimpleStackPanel Spacing="9" Margin="18,14">
+                    <TextBlock Text="• 自由浮动模式：所有窗口默认保持自由浮动，无任何强制切分区打扰，彻底摆脱传统平铺窗口管理器的复杂束缚。" TextWrapping="Wrap" FontSize="12.5" Foreground="{DynamicResource LiquidGlassPrimaryFg}" />
+                    <TextBlock Text="• 缩放与分屏严格解耦：拖拽任意窗口边框调整尺寸时绝不误触贴边分屏，同时自动刷新原始尺寸记忆。" TextWrapping="Wrap" FontSize="12.5" Foreground="{DynamicResource LiquidGlassPrimaryFg}" />
+                    <TextBlock Text="• 多显示器独立吸附：无论主副屏幕、不同缩放比例，均可在任意显示器边缘与顶角自由吸附与跨屏放置。" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource LiquidGlassSecondaryFg}" />
                 </ui:SimpleStackPanel>
             </Border>
 
             <!-- Green Storage -->
-            <TextBlock Text="纯绿色存储规范" Style="{DynamicResource SubtitleTextBlockStyle}" Margin="2,12,0,4" />
-            <Border Style="{DynamicResource SettingsItemStyle}">
-                <ui:SimpleStackPanel Spacing="6">
-                    <TextBlock Text="ScreenSplit 贯彻 100% 绿色便携设计原则：" FontWeight="Medium" />
-                    <TextBlock Text="所有配置数据（Settings.json）与运行日志全部存放在程序所在目录的 Data/ 文件夹内，系统注册表零写入、不残留任何临时文件，随时拷入 U 盘即可在不同电脑即开即用。" TextWrapping="Wrap" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" />
+            <TextBlock Text="纯绿色存储规范" Style="{DynamicResource MacSectionHeaderStyle}" />
+            <Border Style="{DynamicResource MacGroupedCardStyle}">
+                <ui:SimpleStackPanel Spacing="6" Margin="18,14">
+                    <TextBlock Text="ScreenSplit 贯彻 100% 绿色便携设计原则" FontWeight="SemiBold" Foreground="{DynamicResource LiquidGlassPrimaryFg}" />
+                    <TextBlock Text="所有配置数据（settings.json）与运行日志全部存放在程序所在目录的 Data/ 文件夹内，系统注册表零写入、不残留任何临时文件，拷入 U 盘即可在不同电脑即开即用。" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource LiquidGlassSecondaryFg}" />
                 </ui:SimpleStackPanel>
             </Border>
-        </ui:SimpleStackPanel>
+        </StackPanel>
     </Grid>
 </UserControl>

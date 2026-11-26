@@ -15,7 +15,7 @@
     <PackageIcon>Icon.png</PackageIcon>
     <Platforms>AnyCPU;x64;x86</Platforms>
     <StartupObject>FancyWM.Startup</StartupObject>
-    <Version>1.0.34</Version>
+    <Version>1.0.35</Version>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
     <Nullable>enable</Nullable>
@@ -68,6 +68,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Resource Include="Icon.png" />
     <Resource Include="Resources\hand_grab.cur" />
     <Resource Include="Resources\hand_grabbing.cur" />
     <Resource Include="Resources\Icon.ico" />

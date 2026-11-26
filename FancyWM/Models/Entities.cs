@@ -219,7 +219,7 @@ namespace FancyWM.Models
         private static async Task<byte[]> ReadAllAsync(Stream stream)
         {
             byte[] b = new byte[stream.Length - stream.Position];
-            await stream.ReadAsync(b);
+            await stream.ReadExactlyAsync(b);
             return b;
         }
 

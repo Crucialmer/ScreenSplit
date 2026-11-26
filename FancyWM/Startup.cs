@@ -267,14 +267,15 @@ Type 'ScreenSplit --help' from anywhere after installation.
             var logger = provider.GetRequiredService<ILogger>();
             logger.Information($"ScreenSplit v{GetVersionString()} on {Environment.OSVersion}");
 
+#if DEBUG
             AppDomain.CurrentDomain.FirstChanceException += (s, e) =>
             {
-                // Ignore benign exceptions if any, or log all to diagnose
                 if (e.Exception is not OperationCanceledException)
                 {
-                    logger.Warning("FirstChanceException: {Type} - {Message}", e.Exception.GetType().Name, e.Exception.Message);
+                    logger.Debug("FirstChanceException: {Type} - {Message}", e.Exception.GetType().Name, e.Exception.Message);
                 }
             };
+#endif
 
             ConfigureThreadPriority(logger);
 
@@ -354,8 +355,8 @@ Type 'ScreenSplit --help' from anywhere after installation.
         {
             if (Application.Current is App app && app.RestartOnClose)
             {
-                var startupCommand = Environment.ProcessPath ?? (IsPackaged ? $"screensplit" : Assembly.GetEntryAssembly()?.Location.Replace(".dll", ".exe"));
-                if (startupCommand == null)
+                var startupCommand = Environment.ProcessPath ?? (IsPackaged ? "screensplit" : Path.Combine(AppContext.BaseDirectory, "ScreenSplit.exe"));
+                if (string.IsNullOrEmpty(startupCommand))
                 {
                     return;
                 }
@@ -372,7 +373,7 @@ Type 'ScreenSplit --help' from anywhere after installation.
         private static void ConfigureServices(IServiceCollection services, Arguments args)
         {
             ConfigureLogging(services, args);
-            services.AddSingleton<IMicaProvider>(_ => new FauxMicaProvider(TimeSpan.FromSeconds(1)));
+            services.AddSingleton<IMicaProvider>(_ => new FauxMicaProvider(TimeSpan.FromSeconds(5)));
             services.AddSingleton(_ => new LowLevelMouseHook());
             services.AddSingleton(_ => new LowLevelKeyboardHook());
             services.AddSingleton(_ => new ReleaseChecker());
@@ -443,16 +444,7 @@ Type 'ScreenSplit --help' from anywhere after installation.
 
         private static string GetFullVersionString() => $"ScreenSplit v{GetVersionString()} on {Environment.OSVersion}";
 
-        private static string GetVersionString()
-        {
-            var path = Environment.ProcessPath ?? System.Reflection.Assembly.GetEntryAssembly()?.Location;
-            if (!string.IsNullOrEmpty(path))
-            {
-                var versionInfo = FileVersionInfo.GetVersionInfo(path);
-                return versionInfo.FileVersion ?? "1.0.34.0";
-            }
-            return "1.0.34.0";
-        }
+        private static string GetVersionString() => $"{App.DisplayVersion}.0";
 
         private static bool IsAdministrator()
         {

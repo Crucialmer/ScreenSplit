@@ -8,7 +8,7 @@ using FancyWM.ViewModels;
 namespace FancyWM.Windows
 {
     /// <summary>
-    /// Interaction logic for StartupWindow.xaml
+    /// Interaction logic for StartupWindow.xaml (macOS 26 Liquid Glass Welcome Sheet)
     /// </summary>
     public partial class StartupWindow : Window
     {
@@ -19,8 +19,11 @@ namespace FancyWM.Windows
             InitializeComponent();
             m_settingsViewModel = settingsViewModel;
             DataContext = m_settingsViewModel;
-            Loaded += (s, e) =>
+            AppHeroIcon.Source = LiquidGlassTheme.GetAppIconImage();
+
+            Loaded += (_, _) =>
             {
+                LiquidGlassTheme.PlayEntranceAnimation(SheetContainer, SheetTranslate, liftPixels: 12, durationMs: 220);
                 Activate();
                 var hwnd = new WindowInteropHelper(this).EnsureHandle();
                 FocusHelper.ForceActivate(hwnd);
@@ -43,15 +46,9 @@ namespace FancyWM.Windows
             }
         }
 
-        private void OnCloseButtonClick(object sender, RoutedEventArgs e)
-        {
-            Close();
-        }
+        private void OnCloseButtonClick(object sender, RoutedEventArgs e) => Close();
 
-        private void OnMinimizeButtonClick(object sender, RoutedEventArgs e)
-        {
-            WindowState = WindowState.Minimized;
-        }
+        private void OnMinimizeButtonClick(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
 
         private void OnHelpClick(object sender, RoutedEventArgs e)
         {
@@ -59,9 +56,6 @@ namespace FancyWM.Windows
             MainWindow.OpenHelp();
         }
 
-        private void OnStartExperienceClick(object sender, RoutedEventArgs e)
-        {
-            Close();
-        }
+        private void OnStartExperienceClick(object sender, RoutedEventArgs e) => Close();
     }
 }

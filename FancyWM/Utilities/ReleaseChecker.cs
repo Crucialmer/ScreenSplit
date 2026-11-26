@@ -153,15 +153,21 @@ namespace FancyWM.Utilities
             long totalBytesRead = 0;
             int bytesRead;
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            long lastReportMs = -100;
 
             while ((bytesRead = await contentStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0)
             {
                 await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken);
                 totalBytesRead += bytesRead;
 
-                var elapsedSeconds = stopwatch.Elapsed.TotalSeconds;
-                var speedMBps = elapsedSeconds > 0 ? (totalBytesRead / (1024.0 * 1024.0)) / elapsedSeconds : 0;
-                progress?.Report((totalBytesRead, totalBytes, speedMBps));
+                long nowMs = stopwatch.ElapsedMilliseconds;
+                if (progress != null && (nowMs - lastReportMs >= 40 || (totalBytes > 0 && totalBytesRead >= totalBytes)))
+                {
+                    lastReportMs = nowMs;
+                    var elapsedSeconds = stopwatch.Elapsed.TotalSeconds;
+                    var speedMBps = elapsedSeconds > 0 ? (totalBytesRead / (1024.0 * 1024.0)) / elapsedSeconds : 0;
+                    progress.Report((totalBytesRead, totalBytes, speedMBps));
+                }
             }
         }
 
@@ -170,14 +176,17 @@ namespace FancyWM.Utilities
             string repo,
             CancellationToken cancellationToken = default)
         {
-            var releasesUrl = $"https://api.github.com/repos/{owner}/{repo}/releases";
+            var releasesUrl = $"https://api.github.com/repos/{owner}/{repo}/releases?per_page=5";
+
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(20));
 
             using var request = CreateRequest(releasesUrl);
-            using var response = await m_httpClient.SendAsync(request, cancellationToken);
+            using var response = await m_httpClient.SendAsync(request, timeoutCts.Token);
 
             response.EnsureSuccessStatusCode();
 
-            var json = await response.Content.ReadAsStringAsync(cancellationToken);
+            var json = await response.Content.ReadAsStringAsync(timeoutCts.Token);
             var releases = JsonSerializer.Deserialize<GitHubRelease[]>(json, m_jsonOptions);
 
             if (releases == null || releases.Length == 0)

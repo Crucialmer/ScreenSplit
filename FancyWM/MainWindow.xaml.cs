@@ -88,6 +88,7 @@ namespace FancyWM
         private bool m_notifyVirtualDesktopServiceIncompatibility;
         private LowLevelHotkey[] m_directHks = [];
         private DispatcherTimer m_dispatcherTimer;
+        private readonly CancellationTokenSource m_updateLoopCts = new();
 
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
         public MainWindow()
@@ -427,48 +428,58 @@ namespace FancyWM
 
         private async Task UpdateCheckLoopAsync(ReleaseChecker releaseChecker)
         {
-            // 启动时延迟 3 秒，避开刚打开软件时的初始化资源竞争，确保网络完全就绪
-            await Task.Delay(TimeSpan.FromSeconds(3));
-
-            bool isFirstCheck = true;
-            while (true)
+            var token = m_updateLoopCts.Token;
+            try
             {
-                if (m_checkForUpdates)
-                {
-                    await CheckForUpdatesAsync(releaseChecker, isStartupCheck: isFirstCheck);
-                }
+                // 启动时延迟 3 秒，避开刚打开软件时的初始化资源竞争，确保网络完全就绪
+                await Task.Delay(TimeSpan.FromSeconds(3), token);
 
-                isFirstCheck = false;
-                await Task.Delay(TimeSpan.FromHours(6));
+                bool isFirstCheck = true;
+                while (!token.IsCancellationRequested)
+                {
+                    if (m_checkForUpdates)
+                    {
+                        await CheckForUpdatesAsync(releaseChecker, isStartupCheck: isFirstCheck, token);
+                    }
+
+                    isFirstCheck = false;
+                    await Task.Delay(TimeSpan.FromHours(6), token);
+                }
+            }
+            catch (OperationCanceledException)
+            {
             }
         }
 
-        private async Task CheckForUpdatesAsync(ReleaseChecker releaseChecker, bool isStartupCheck = false)
+        private async Task CheckForUpdatesAsync(ReleaseChecker releaseChecker, bool isStartupCheck = false, CancellationToken cancellationToken = default)
         {
             try
             {
                 m_logger.Information("[Update] Checking for updates (startup={IsStartup})...", isStartupCheck);
-                var latestRelease = await releaseChecker.GetLatestReleaseInfoAsync("Crucialmer", "ScreenSplit");
+                var latestRelease = await releaseChecker.GetLatestReleaseInfoAsync("Crucialmer", "ScreenSplit", cancellationToken);
                 if (latestRelease?.Version == null)
                 {
                     return;
                 }
 
-                var currentVersion = new Version(App.Current.VersionString);
+                var currentVersion = App.NormalizedVersion;
                 if (latestRelease.Version > currentVersion)
                 {
                     m_logger.Information("[Update] New version found: {Latest} (current: {Current})", latestRelease.Version, currentVersion);
 
-                    // 启动检测到新版本时，自动弹出美观的更新窗口，供用户一键下载并更新！
+                    // 启动检测到新版本时，直接传入已拉取的 ReleaseInfo 立即弹出更新窗口（零二次网络请求）
                     await Dispatcher.InvokeAsync(() =>
                     {
-                        UpdateWindow.ShowUpdateDialog();
+                        UpdateWindow.ShowUpdateDialog(preloadedRelease: latestRelease);
                     });
                 }
                 else
                 {
                     m_logger.Information("[Update] Current version {Current} is up to date.", currentVersion);
                 }
+            }
+            catch (OperationCanceledException)
+            {
             }
             catch (Exception ex)
             {
@@ -1068,18 +1079,35 @@ namespace FancyWM
 
         internal static void OpenHelp()
         {
-            if (App.Current.Windows.OfType<SettingsWindow>().Any())
+            if (App.Current == null)
             {
-                var window = App.Current.Windows.OfType<SettingsWindow>().First();
-                window.GoToPage(typeof(HelpPage));
-                window.Activate();
+                return;
+            }
+            if (!App.Current.Dispatcher.CheckAccess())
+            {
+                App.Current.Dispatcher.InvokeAsync(OpenHelp);
+                return;
+            }
+
+            SettingsWindow window;
+            if (App.Current.Windows.OfType<SettingsWindow>().FirstOrDefault() is SettingsWindow existing)
+            {
+                window = existing;
             }
             else
             {
-                var window = new SettingsWindow(new ViewModels.SettingsViewModel(App.Current.AppState.Settings));
-                window.GoToPage(typeof(HelpPage));
+                window = new SettingsWindow(new ViewModels.SettingsViewModel(App.Current.AppState.Settings));
                 window.Show();
             }
+
+            if (window.WindowState == System.Windows.WindowState.Minimized)
+            {
+                window.WindowState = System.Windows.WindowState.Normal;
+            }
+            window.GoToPage(typeof(HelpPage));
+            window.Activate();
+            var hwnd = new WindowInteropHelper(window).EnsureHandle();
+            FocusHelper.ForceActivate(hwnd);
         }
 
         private async void OnCmdSequenceBegin(object? sender, EventArgs e)
@@ -1697,6 +1725,9 @@ namespace FancyWM
             m_workspace.FocusedWindowChanged -= OnFocusedWindowChanged;
 
             m_logger.Debug($"Disposing of {nameof(MainWindow)}...");
+
+            m_updateLoopCts.Cancel();
+            m_updateLoopCts.Dispose();
 
             if (m_tiling?.Active == true)
             {

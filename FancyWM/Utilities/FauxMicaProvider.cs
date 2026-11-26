@@ -29,10 +29,12 @@ namespace FancyWM.Utilities
         private string? m_lastWallpaperPath;
         private readonly Thread m_thread;
         private readonly TimeSpan m_checkingInterval;
+        private readonly ManualResetEventSlim m_stopEvent = new(false);
         private volatile bool m_disposed;
 
         public FauxMicaProvider(TimeSpan checkingInterval)
         {
+            m_checkingInterval = checkingInterval;
             m_thread = new Thread(ThreadMain)
             {
                 Name = "FauxMicaProviderThread",
@@ -40,7 +42,6 @@ namespace FancyWM.Utilities
                 IsBackground = true,
             };
             m_thread.Start();
-            m_checkingInterval = checkingInterval;
         }
 
         private void ThreadMain()
@@ -122,13 +123,15 @@ namespace FancyWM.Utilities
                     {
                         PrimaryColorChanged?.Invoke(this, new MicaOptionsChangedEventArgs());
                     }
-
-                    Thread.Sleep(m_checkingInterval);
                 }
                 catch (Exception e)
                 {
-                    App.Current.Logger.Debug(e, "FauxMicaProvider wallpaper background acquisition skipped or failed");
-                    return;
+                    App.Current?.Logger?.Debug(e, "FauxMicaProvider wallpaper background acquisition skipped or failed");
+                }
+
+                if (m_stopEvent.Wait(m_checkingInterval))
+                {
+                    break;
                 }
             }
         }
@@ -240,7 +243,9 @@ namespace FancyWM.Utilities
         public void Dispose()
         {
             m_disposed = true;
-            m_thread?.Join(m_checkingInterval * 2);
+            m_stopEvent.Set();
+            m_thread?.Join(TimeSpan.FromMilliseconds(500));
+            m_stopEvent.Dispose();
         }
     }
 }

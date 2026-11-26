@@ -83,6 +83,8 @@ namespace FancyWM.Windows
         private readonly IntPtr m_nonHitTestableHwnd;
         private readonly LowLevelMouseHook? m_mshk;
         private bool m_isShown;
+        private bool m_isUpdateLoopRunning;
+        private volatile bool m_isUpdatePositionsScheduled;
 
         public OverlayHost(IDisplay display)
         {
@@ -130,21 +132,38 @@ namespace FancyWM.Windows
 
         public void Show()
         {
+            if (m_isShown)
+            {
+                UpdatePositions();
+                return;
+            }
+
             m_nonHitTestableWindow.Show();
-            // Hit-testable window goes on top, because it after an interaction,
+            // Hit-testable window goes on top, because after an interaction,
             // it will be raised above the non-hit testable window anyway.
             m_window.Show();
             m_isShown = true;
 
-            async void UpdateLoop()
+            if (!m_isUpdateLoopRunning)
             {
-                while (m_isShown)
+                m_isUpdateLoopRunning = true;
+                async void UpdateLoop()
                 {
-                    UpdatePositions();
-                    await Task.Delay(1000);
+                    try
+                    {
+                        while (m_isShown)
+                        {
+                            UpdatePositions();
+                            await Task.Delay(1500);
+                        }
+                    }
+                    finally
+                    {
+                        m_isUpdateLoopRunning = false;
+                    }
                 }
+                UpdateLoop();
             }
-            UpdateLoop();
         }
 
         internal void Hide()
@@ -251,15 +270,35 @@ namespace FancyWM.Windows
 
         private void DispatchUpdatePositions()
         {
-            if (m_isShown)
+            if (m_isShown && !m_isUpdatePositionsScheduled)
             {
-                Dispatcher.BeginInvoke(() => UpdatePositions());
+                m_isUpdatePositionsScheduled = true;
+                Dispatcher.BeginInvoke(() =>
+                {
+                    m_isUpdatePositionsScheduled = false;
+                    if (m_isShown)
+                    {
+                        UpdatePositions();
+                    }
+                }, System.Windows.Threading.DispatcherPriority.Background);
             }
         }
 
         private volatile bool m_isScheduled = false;
         private void OnCursorLocationChanged(object? sender, CursorLocationChangedEventArgs e)
         {
+            // ScreenSplit runs in pure edge-snap mode without visible interactive panel bars;
+            // skip per-pixel VisualTreeHelper.HitTest unless interactive content is actually visible.
+            if (!m_isShown || Content == null || !Content.IsVisible)
+            {
+                return;
+            }
+            if (Content is Controls.TilingOverlay overlay &&
+                (overlay.ViewModel == null || (overlay.ViewModel.PanelElements.Count == 0 && overlay.ViewModel.WindowElements.Count == 0)))
+            {
+                return;
+            }
+
             if (!m_isScheduled)
             {
                 m_isScheduled = true;

@@ -5,192 +5,392 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:ui="http://schemas.modernwpf.com/2019"
         xmlns:collections="clr-namespace:System.Collections;assembly=mscorlib"
+        xmlns:local="clr-namespace:FancyWM"
         xmlns:viewmodels="clr-namespace:FancyWM.ViewModels"
         xmlns:pages="clr-namespace:FancyWM.Pages.Settings"
         xmlns:res="clr-namespace:FancyWM.Resources"
         mc:Ignorable="d"
-        Height="680"
-        Width="920"
-        MinWidth="520"
-        MinHeight="420"
+        Height="700"
+        Width="960"
+        MinWidth="680"
+        MinHeight="480"
+        WindowStyle="None"
+        ResizeMode="CanResize"
         WindowStartupLocation="CenterScreen"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType"
+        RenderOptions.BitmapScalingMode="HighQuality"
         FontFamily="Segoe UI Variable Text, -apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, Microsoft YaHei UI, sans-serif"
         FontSize="13.5"
         Title="{x:Static res:Strings.Settings_FancyWM}"
-        Background="{DynamicResource SystemControlPageBackgroundAltHighBrush}"
-        Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}"
+        Background="Transparent"
+        Foreground="{DynamicResource LiquidGlassPrimaryFg}"
         ui:ThemeManager.IsThemeAware="True"
         Focusable="True">
-    <DockPanel>
-        <!-- macOS Style Left Sidebar -->
-        <Border DockPanel.Dock="Left"
-                Width="245"
-                Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
-                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-                BorderThickness="0,0,1,0">
-            <DockPanel LastChildFill="True">
-                <!-- macOS Sidebar App Identity Header -->
-                <Border DockPanel.Dock="Top" Margin="14,16,14,10" Padding="6,4">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border Width="34" Height="34" CornerRadius="8" Background="#007AFF" Margin="0,0,10,0">
-                            <Border.Effect>
-                                <DropShadowEffect BlurRadius="6" ShadowDepth="2" Direction="270" Opacity="0.25" Color="#007AFF" />
-                            </Border.Effect>
-                            <Image Source="/Resources/Icon.ico" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0"
+                      CornerRadius="22"
+                      GlassFrameThickness="-1"
+                      ResizeBorderThickness="6"
+                      UseAeroCaptionButtons="False" />
+    </WindowChrome.WindowChrome>
+
+    <Window.Resources>
+        <!-- macOS 26 Group-Hover Traffic Light Styles -->
+        <Style x:Key="MacTrafficLightButton" TargetType="Button">
+            <Setter Property="Width" Value="12" />
+            <Setter Property="Height" Value="12" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True" />
+        </Style>
+    </Window.Resources>
+
+    <!-- Root Liquid Glass Window Shell -->
+    <Border x:Name="RootShell"
+            Background="{DynamicResource LiquidGlassSettingsShellBg}"
+            BorderBrush="{DynamicResource LiquidGlassWindowBorder}"
+            BorderThickness="1"
+            SnapsToDevicePixels="True">
+        <Grid x:Name="RootContent">
+            <Grid.RenderTransform>
+                <TranslateTransform x:Name="RootTranslate" Y="0" />
+            </Grid.RenderTransform>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="264" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- macOS 26 Tahoe Detached Floating Liquid Glass Sidebar -->
+            <Border Grid.Column="0"
+                    Margin="12,12,0,12"
+                    CornerRadius="16"
+                    Background="{DynamicResource LiquidGlassSidebarBg}"
+                    BorderBrush="{DynamicResource LiquidGlassCardBorder}"
+                    BorderThickness="1"
+                    SnapsToDevicePixels="True">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="18" ShadowDepth="3" Direction="270" Opacity="0.14" Color="#000000" />
+                </Border.Effect>
+
+                <Grid>
+                    <!-- Top Liquid Glass Specular Refraction Sheen -->
+                    <Border CornerRadius="15,15,8,8"
+                            VerticalAlignment="Top"
+                            Height="48"
+                            Margin="0.5,0.5,0.5,0"
+                            Background="{DynamicResource LiquidGlassTopSheen}"
+                            IsHitTestVisible="False" />
+
+                    <DockPanel LastChildFill="True">
+                        <!-- Top Traffic Lights & Drag Strip -->
+                        <Border DockPanel.Dock="Top"
+                                Height="38"
+                                Padding="14,12,14,0"
+                                Background="Transparent"
+                                MouseLeftButtonDown="OnTitleBarMouseDown">
+                            <StackPanel x:Name="TrafficLightsPanel"
+                                        Orientation="Horizontal"
+                                        VerticalAlignment="Center"
+                                        HorizontalAlignment="Left"
+                                        Background="Transparent">
+                                <!-- Red (Close) -->
+                                <Button Style="{StaticResource MacTrafficLightButton}"
+                                        Click="OnCloseButtonClick"
+                                        Margin="0,0,8,0"
+                                        ToolTip="关闭设置">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="Dot" Width="12" Height="12" CornerRadius="6" Background="#FF5F56" BorderBrush="#D9453E" BorderThickness="0.5">
+                                                <TextBlock x:Name="Glyph" Text="×" FontSize="9.5" FontWeight="Bold" Foreground="#5A0000" Opacity="0" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-1.5,0,0" />
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding IsActive, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                                                    <Setter TargetName="Dot" Property="Background" Value="#488E8E93" />
+                                                    <Setter TargetName="Dot" Property="BorderBrush" Value="#308E8E93" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsMouseOver, ElementName=TrafficLightsPanel}" Value="True">
+                                                    <Setter TargetName="Dot" Property="Background" Value="#FF5F56" />
+                                                    <Setter TargetName="Dot" Property="BorderBrush" Value="#D9453E" />
+                                                    <Setter TargetName="Glyph" Property="Opacity" Value="0.88" />
+                                                </DataTrigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+
+                                <!-- Yellow (Minimize) -->
+                                <Button Style="{StaticResource MacTrafficLightButton}"
+                                        Click="OnMinimizeButtonClick"
+                                        Margin="0,0,8,0"
+                                        ToolTip="最小化">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="Dot" Width="12" Height="12" CornerRadius="6" Background="#FFBD2E" BorderBrush="#D99B1C" BorderThickness="0.5">
+                                                <TextBlock x:Name="Glyph" Text="−" FontSize="9.5" FontWeight="Bold" Foreground="#5C3B00" Opacity="0" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-1.5,0,0" />
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding IsActive, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                                                    <Setter TargetName="Dot" Property="Background" Value="#488E8E93" />
+                                                    <Setter TargetName="Dot" Property="BorderBrush" Value="#308E8E93" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsMouseOver, ElementName=TrafficLightsPanel}" Value="True">
+                                                    <Setter TargetName="Dot" Property="Background" Value="#FFBD2E" />
+                                                    <Setter TargetName="Dot" Property="BorderBrush" Value="#D99B1C" />
+                                                    <Setter TargetName="Glyph" Property="Opacity" Value="0.88" />
+                                                </DataTrigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+
+                                <!-- Green (Maximize / Restore) -->
+                                <Button Style="{StaticResource MacTrafficLightButton}"
+                                        Click="OnMaximizeButtonClick"
+                                        ToolTip="最大化 / 还原">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="Dot" Width="12" Height="12" CornerRadius="6" Background="#27C93F" BorderBrush="#19A92C" BorderThickness="0.5">
+                                                <TextBlock x:Name="Glyph" Text="+" FontSize="9.5" FontWeight="Bold" Foreground="#004D0E" Opacity="0" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-1.5,0,0" />
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding IsActive, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                                                    <Setter TargetName="Dot" Property="Background" Value="#488E8E93" />
+                                                    <Setter TargetName="Dot" Property="BorderBrush" Value="#308E8E93" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsMouseOver, ElementName=TrafficLightsPanel}" Value="True">
+                                                    <Setter TargetName="Dot" Property="Background" Value="#27C93F" />
+                                                    <Setter TargetName="Dot" Property="BorderBrush" Value="#19A92C" />
+                                                    <Setter TargetName="Glyph" Property="Opacity" Value="0.88" />
+                                                </DataTrigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+                            </StackPanel>
                         </Border>
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="ScreenSplit" FontWeight="SemiBold" FontSize="15" Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}" />
-                            <TextBlock Text="v1.0.34 · 纯绿色便携" FontSize="11" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="0,1,0,0" />
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
 
-                <!-- Divider -->
-                <Rectangle DockPanel.Dock="Top" Height="1" Fill="{DynamicResource SystemControlForegroundBaseLowBrush}" Margin="14,0,14,8" Opacity="0.4" />
+                        <!-- Sidebar App Identity Header -->
+                        <Border DockPanel.Dock="Top"
+                                Margin="12,10,12,10"
+                                Padding="6,4"
+                                Background="Transparent"
+                                MouseLeftButtonDown="OnTitleBarMouseDown">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border Width="38" Height="38" CornerRadius="10" Margin="0,0,11,0">
+                                    <Border.Effect>
+                                        <DropShadowEffect BlurRadius="10" ShadowDepth="2" Direction="270" Opacity="0.22" Color="#000000" />
+                                    </Border.Effect>
+                                    <Image x:Name="SidebarAppIcon" Width="38" Height="38" Stretch="Uniform" />
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="ScreenSplit"
+                                               FontFamily="Segoe UI Variable Display, -apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei UI"
+                                               FontWeight="SemiBold"
+                                               FontSize="15.5"
+                                               Foreground="{DynamicResource LiquidGlassPrimaryFg}" />
+                                    <TextBlock Text="{x:Static local:App.SidebarVersionText}"
+                                               FontSize="11"
+                                               Foreground="{DynamicResource LiquidGlassSecondaryFg}"
+                                               Margin="0,1.5,0,0" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
 
-                <!-- Bottom Quit Button -->
-                <Border DockPanel.Dock="Bottom" Padding="12,12" Background="Transparent">
-                    <Button HorizontalAlignment="Stretch" Click="OnQuitButtonClick" Cursor="Hand"
-                            Background="Transparent" BorderThickness="0" Padding="8,8"
-                            HorizontalContentAlignment="Left">
-                        <Button.Resources>
-                            <CornerRadius x:Key="ControlCornerRadius">8</CornerRadius>
-                        </Button.Resources>
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <Border Width="26" Height="26" CornerRadius="6" Background="#FF3B30" Margin="0,0,10,0">
-                                <ui:FontIcon FontSize="12" FontFamily="Segoe MDL2 Assets" Glyph="&#xE7E8;" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            </Border>
-                            <TextBlock Text="{x:Static res:Strings.Quit}" FontSize="13" FontWeight="Medium" Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                </Border>
+                        <!-- Hairline Divider -->
+                        <Rectangle DockPanel.Dock="Top" Height="1" Fill="{DynamicResource LiquidGlassSeparator}" Margin="14,0,14,8" />
 
-                <!-- Navigation List with macOS Squircles -->
-                <ListView
-                    x:Name="PagesList"
-                    SelectionMode="Single"
-                    SelectedValuePath="Page"
-                    SelectedIndex="0"
-                    BorderThickness="0"
-                    Background="Transparent"
-                    SelectionChanged="PagesList_SelectionChanged">
-                    <ListView.ItemContainerStyle>
-                        <Style TargetType="ListViewItem" BasedOn="{StaticResource DefaultListViewItemStyle}">
-                            <Setter Property="Margin" Value="10,2,10,2" />
-                            <Setter Property="Padding" Value="8,6" />
-                            <Setter Property="Cursor" Value="Hand" />
-                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="ListViewItem">
-                                        <Border x:Name="ItemBorder"
-                                                CornerRadius="8"
+                        <!-- Bottom Quit Glass Action -->
+                        <Border DockPanel.Dock="Bottom" Padding="10,8,10,10">
+                            <Button HorizontalAlignment="Stretch"
+                                    Click="OnQuitButtonClick"
+                                    Cursor="Hand"
+                                    FocusVisualStyle="{x:Null}">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="QuitBg"
+                                                CornerRadius="10"
                                                 Background="Transparent"
-                                                Padding="{TemplateBinding Padding}"
+                                                Padding="10,8"
                                                 SnapsToDevicePixels="True">
-                                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Border Width="26" Height="26" CornerRadius="7" Background="{DynamicResource LiquidGlassDestructiveBrush}" Margin="0,0,10,0">
+                                                    <ui:FontIcon FontSize="12" FontFamily="Segoe MDL2 Assets" Glyph="&#xE7E8;" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <TextBlock Text="{x:Static res:Strings.Quit}" FontSize="13" FontWeight="Medium" Foreground="{DynamicResource LiquidGlassDestructiveBrush}" VerticalAlignment="Center" />
+                                            </StackPanel>
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}" />
+                                                <Setter TargetName="QuitBg" Property="Background" Value="{DynamicResource LiquidGlassDestructiveHoverBg}" />
                                             </Trigger>
-                                            <Trigger Property="IsSelected" Value="True">
-                                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource SystemControlHighlightListAccentLowBrush}" />
+                                            <Trigger Property="IsPressed" Value="True">
+                                                <Setter TargetName="QuitBg" Property="Opacity" Value="0.78" />
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                    </ListView.ItemContainerStyle>
-                    <ListView.ItemsSource>
-                        <collections:ArrayList>
-                            <!-- General -->
-                            <viewmodels:PageItem Page="{x:Type pages:GeneralPage}">
-                                <viewmodels:PageItem.Header>
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Border Width="26" Height="26" CornerRadius="6" Background="#8E8E93" Margin="0,0,10,0">
-                                            <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE713;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                        </Border>
-                                        <TextBlock Text="{x:Static res:Strings.General_Caption}" FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </viewmodels:PageItem.Header>
-                            </viewmodels:PageItem>
+                                </Button.Template>
+                            </Button>
+                        </Border>
 
-                            <!-- Interface -->
-                            <viewmodels:PageItem Page="{x:Type pages:InterfacePage}">
-                                <viewmodels:PageItem.Header>
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Border Width="26" Height="26" CornerRadius="6" Background="#007AFF" Margin="0,0,10,0">
-                                            <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE771;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                        </Border>
-                                        <TextBlock Text="{x:Static res:Strings.Interface_Caption}" FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </viewmodels:PageItem.Header>
-                            </viewmodels:PageItem>
+                        <!-- macOS 26 Glass Pill Navigation List -->
+                        <ListView x:Name="PagesList"
+                                  SelectionMode="Single"
+                                  SelectedValuePath="Page"
+                                  SelectedIndex="0"
+                                  BorderThickness="0"
+                                  Background="Transparent"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                  SelectionChanged="PagesList_SelectionChanged">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="Margin" Value="10,2,10,2" />
+                                    <Setter Property="Padding" Value="9,7" />
+                                    <Setter Property="Cursor" Value="Hand" />
+                                    <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    <Setter Property="Foreground" Value="{DynamicResource LiquidGlassPrimaryFg}" />
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListViewItem">
+                                                <Border x:Name="ItemBorder"
+                                                        CornerRadius="10"
+                                                        Background="Transparent"
+                                                        BorderBrush="Transparent"
+                                                        BorderThickness="1"
+                                                        Padding="{TemplateBinding Padding}"
+                                                        SnapsToDevicePixels="True">
+                                                    <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource LiquidGlassNavHoverBg}" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsSelected" Value="True">
+                                                        <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource LiquidGlassNavSelectedBg}" />
+                                                        <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource LiquidGlassNavSelectedBorder}" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.ItemsSource>
+                                <collections:ArrayList>
+                                    <!-- General -->
+                                    <viewmodels:PageItem Page="{x:Type pages:GeneralPage}">
+                                        <viewmodels:PageItem.Header>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Border Width="26" Height="26" CornerRadius="7" Background="#8E8E93" Margin="0,0,10,0">
+                                                    <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE713;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <TextBlock Text="{x:Static res:Strings.General_Caption}" FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </viewmodels:PageItem.Header>
+                                    </viewmodels:PageItem>
 
-                            <!-- Interaction -->
-                            <viewmodels:PageItem Page="{x:Type pages:InteractionPage}">
-                                <viewmodels:PageItem.Header>
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Border Width="26" Height="26" CornerRadius="6" Background="#AF52DE" Margin="0,0,10,0">
-                                            <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE7C9;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                        </Border>
-                                        <TextBlock Text="{x:Static res:Strings.Interaction_Caption}" FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </viewmodels:PageItem.Header>
-                            </viewmodels:PageItem>
+                                    <!-- Interface -->
+                                    <viewmodels:PageItem Page="{x:Type pages:InterfacePage}">
+                                        <viewmodels:PageItem.Header>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Border Width="26" Height="26" CornerRadius="7" Background="#007AFF" Margin="0,0,10,0">
+                                                    <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE771;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <TextBlock Text="{x:Static res:Strings.Interface_Caption}" FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </viewmodels:PageItem.Header>
+                                    </viewmodels:PageItem>
 
-                            <!-- Rules -->
-                            <viewmodels:PageItem Page="{x:Type pages:RulesPage}">
-                                <viewmodels:PageItem.Header>
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Border Width="26" Height="26" CornerRadius="6" Background="#FF9500" Margin="0,0,10,0">
-                                            <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE82D;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                        </Border>
-                                        <TextBlock Text="{x:Static res:Strings.Rules_Caption}" FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </viewmodels:PageItem.Header>
-                            </viewmodels:PageItem>
+                                    <!-- Interaction -->
+                                    <viewmodels:PageItem Page="{x:Type pages:InteractionPage}">
+                                        <viewmodels:PageItem.Header>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Border Width="26" Height="26" CornerRadius="7" Background="#AF52DE" Margin="0,0,10,0">
+                                                    <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE7C9;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <TextBlock Text="{x:Static res:Strings.Interaction_Caption}" FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </viewmodels:PageItem.Header>
+                                    </viewmodels:PageItem>
 
-                            <!-- Help -->
-                            <viewmodels:PageItem Page="{x:Type pages:HelpPage}">
-                                <viewmodels:PageItem.Header>
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Border Width="26" Height="26" CornerRadius="6" Background="#30B0C7" Margin="0,0,10,0">
-                                            <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE897;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                        </Border>
-                                        <TextBlock Text="{x:Static res:Strings.Help_Caption}" FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </viewmodels:PageItem.Header>
-                            </viewmodels:PageItem>
+                                    <!-- Rules -->
+                                    <viewmodels:PageItem Page="{x:Type pages:RulesPage}">
+                                        <viewmodels:PageItem.Header>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Border Width="26" Height="26" CornerRadius="7" Background="#FF9500" Margin="0,0,10,0">
+                                                    <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE82D;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <TextBlock Text="{x:Static res:Strings.Rules_Caption}" FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </viewmodels:PageItem.Header>
+                                    </viewmodels:PageItem>
 
-                            <!-- About -->
-                            <viewmodels:PageItem Page="{x:Type pages:AboutPage}">
-                                <viewmodels:PageItem.Header>
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Border Width="26" Height="26" CornerRadius="6" Background="#FF2D55" Margin="0,0,10,0">
-                                            <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE946;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                        </Border>
-                                        <TextBlock Text="{x:Static res:Strings.About_Caption}" FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </viewmodels:PageItem.Header>
-                            </viewmodels:PageItem>
-                        </collections:ArrayList>
-                    </ListView.ItemsSource>
-                    <ListView.ItemTemplate>
-                        <DataTemplate>
-                            <ContentControl Content="{Binding Header}" />
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
+                                    <!-- Help -->
+                                    <viewmodels:PageItem Page="{x:Type pages:HelpPage}">
+                                        <viewmodels:PageItem.Header>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Border Width="26" Height="26" CornerRadius="7" Background="#30B0C7" Margin="0,0,10,0">
+                                                    <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE897;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <TextBlock Text="{x:Static res:Strings.Help_Caption}" FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </viewmodels:PageItem.Header>
+                                    </viewmodels:PageItem>
+
+                                    <!-- About -->
+                                    <viewmodels:PageItem Page="{x:Type pages:AboutPage}">
+                                        <viewmodels:PageItem.Header>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Border Width="26" Height="26" CornerRadius="7" Background="#FF2D55" Margin="0,0,10,0">
+                                                    <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE946;" Foreground="White" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <TextBlock Text="{x:Static res:Strings.About_Caption}" FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </viewmodels:PageItem.Header>
+                                    </viewmodels:PageItem>
+                                </collections:ArrayList>
+                            </ListView.ItemsSource>
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <ContentControl Content="{Binding Header}" />
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </DockPanel>
+                </Grid>
+            </Border>
+
+            <!-- Right Content Area with Seamless Drag Header + macOS Thin Scrollbar -->
+            <DockPanel Grid.Column="1" LastChildFill="True">
+                <!-- Seamless Frameless Drag Bar -->
+                <Border DockPanel.Dock="Top"
+                        Height="28"
+                        Background="Transparent"
+                        MouseLeftButtonDown="OnTitleBarMouseDown" />
+
+                <ScrollViewer x:Name="ContentScroller"
+                              CanContentScroll="False"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <ScrollViewer.Resources>
+                        <Style TargetType="ScrollBar" BasedOn="{StaticResource MacThinScrollBar}" />
+                    </ScrollViewer.Resources>
+                    <Border x:Name="PageContent"
+                            Padding="28,0,34,32"
+                            MinWidth="400">
+                        <Border.RenderTransform>
+                            <TranslateTransform x:Name="PageTranslate" Y="0" />
+                        </Border.RenderTransform>
+                    </Border>
+                </ScrollViewer>
             </DockPanel>
-        </Border>
-
-        <!-- Main Content Area with macOS Breathable Padding -->
-        <ScrollViewer CanContentScroll="False" HorizontalScrollBarVisibility="Auto">
-            <Border MinWidth="480" Padding="32,24,36,32" Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=ScrollViewer}}" x:Name="PageContent" />
-        </ScrollViewer>
-    </DockPanel>
+        </Grid>
+    </Border>
 </Window>

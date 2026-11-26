@@ -33,15 +33,17 @@ namespace FancyWM.Utilities
             var isDarkTheme = ModernWpf.ThemeManager.Current.ActualApplicationTheme == ModernWpf.ApplicationTheme.Dark;
             var isRounded = Environment.OSVersion.Version.Build >= 22000;
 
-            var previewBorderColor = accentLight2;
-            var previewRectangleFill = accentLight1.WithOpacity(0.26);
+            var previewBorderColor = isDarkTheme ? accentLight2 : accent;
+            var previewRectangleFill = isDarkTheme
+                ? accentLight1.WithOpacity(0.20)
+                : accent.WithOpacity(0.16);
             var panelBarBackground = isDarkTheme ? Color.FromRgb(0x1F, 0x1F, 0x1F) : Color.FromRgb(0xCD, 0xCD, 0xCD);
             var panelBarButtonBackground = isDarkTheme ? accentLight2 : accentDark1;
             var panelBarBorder = isDarkTheme ? Color.FromArgb(0x19, 0, 0, 0) : Color.FromArgb(0x19, 255, 255, 255);
             var panelBarButtonText = isDarkTheme ? Colors.Black : Colors.White;
             var panelBarTabText = isDarkTheme ? Colors.White : Colors.Black;
-            var controlBorderRadius = isRounded ? 10 : 0;
-            var overlayBorderRadius = isRounded ? 14 : 0;
+            var controlBorderRadius = isRounded ? 14 : 0;
+            var overlayBorderRadius = isRounded ? 18 : 0;
             var panelBarButtonBackgroundHover = accentLight1;
             var panelBarButtonBackgroundActive = accentDark1;
 
@@ -49,16 +51,16 @@ namespace FancyWM.Utilities
 /* Generated file _default.css - ANY CHANGES WILL NOT BE SAVED */
 window:focus {{
     border-color: {previewBorderColor.ToCss()};
-    border-width: 2.5px;
+    border-width: 2px;
     border-radius: {overlayBorderRadius}px;
-    filter: drop-shadow(0px 0px 8px {previewBorderColor.WithOpacity(0.5).ToCss()});
+    filter: drop-shadow(0px 0px 8px {previewBorderColor.WithOpacity(0.45).ToCss()});
 }}
 window.preview, panel.preview {{
-    border-color: {previewBorderColor.ToCss()};
-    border-width: 2.5px;
+    border-color: {previewBorderColor.WithOpacity(0.75).ToCss()};
+    border-width: 1.5px;
     border-radius: {overlayBorderRadius}px;
     background-color: {previewRectangleFill.ToCss()};
-    filter: drop-shadow(0px 0px 10px {previewBorderColor.WithOpacity(0.5).ToCss()});
+    filter: drop-shadow(0px 0px 10px {previewBorderColor.WithOpacity(0.35).ToCss()});
 }}
 panel-bar {{
     border-color: {panelBarBorder.ToCss()};

@@ -4,50 +4,66 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:ui="http://schemas.modernwpf.com/2019"
+        xmlns:local="clr-namespace:FancyWM"
+        xmlns:res="clr-namespace:FancyWM.Resources"
         mc:Ignorable="d"
         Title="ScreenSplitMainWindow"
-        xmlns:res="clr-namespace:FancyWM.Resources"
         WindowStyle="None"
         Focusable="True"
         ShowInTaskbar="False"
         WindowState="Minimized">
     <Window.Resources>
-        <ContextMenu x:Key="NotifierContextMenu" Placement="MousePoint" StaysOpen="False">
+        <ContextMenu x:Key="NotifierContextMenu"
+                     Placement="MousePoint"
+                     StaysOpen="False"
+                     Padding="4,6"
+                     Background="{DynamicResource LiquidGlassMenuBg}"
+                     BorderBrush="{DynamicResource LiquidGlassWindowBorder}"
+                     BorderThickness="1">
             <MenuItem IsHitTestVisible="False" Focusable="False">
                 <MenuItem.Header>
-                    <StackPanel Orientation="Vertical" Margin="-6,2,-6,2">
+                    <StackPanel Orientation="Vertical" Margin="-6,3,-6,3">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <Ellipse Width="8" Height="8" Fill="#10B981" Margin="0,0,7,0" VerticalAlignment="Center">
+                            <Ellipse Width="8" Height="8" Fill="{DynamicResource LiquidGlassEmeraldBrush}" Margin="0,0,8,0" VerticalAlignment="Center">
                                 <Ellipse.Effect>
-                                    <DropShadowEffect BlurRadius="4" ShadowDepth="0" Color="#10B981" Opacity="0.8" />
+                                    <DropShadowEffect BlurRadius="6" ShadowDepth="0" Color="#30D158" Opacity="0.85" />
                                 </Ellipse.Effect>
                             </Ellipse>
-                            <TextBlock Text="ScreenSplit  v1.0.34" FontWeight="SemiBold" FontSize="12.5" Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}" />
+                            <TextBlock Text="{x:Static local:App.TrayTitleText}"
+                                       FontWeight="SemiBold"
+                                       FontSize="13"
+                                       Foreground="{DynamicResource LiquidGlassPrimaryFg}" />
                         </StackPanel>
-                        <TextBlock Text="纯绿色便携 · 边缘智能吸附分屏" FontSize="11" Foreground="{DynamicResource SystemControlPageTextBaseHighBrush}" Margin="15,3,0,0" />
+                        <TextBlock Text="纯绿色便携 · 240Hz 边缘智能吸附分屏"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource LiquidGlassSecondaryFg}"
+                                   Margin="16,3,0,0" />
                     </StackPanel>
                 </MenuItem.Header>
             </MenuItem>
             <Separator />
             <MenuItem Header="{x:Static res:Strings.Settings}" Click="OnSettingsClick">
                 <MenuItem.Icon>
-                    <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE713;" FontSize="13" />
+                    <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE713;" FontSize="13" Foreground="{DynamicResource LiquidGlassAccentBrush}" />
                 </MenuItem.Icon>
             </MenuItem>
             <MenuItem Header="检查更新..." Click="OnCheckUpdatesClick">
                 <MenuItem.Icon>
-                    <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE895;" FontSize="13" />
+                    <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE895;" FontSize="13" Foreground="{DynamicResource LiquidGlassEmeraldBrush}" />
                 </MenuItem.Icon>
             </MenuItem>
             <Separator />
             <MenuItem IsHitTestVisible="False" Focusable="False">
                 <MenuItem.Header>
-                    <TextBlock Text="恢复系统原生贴靠退出软件即可" FontSize="11.5" Foreground="{DynamicResource SystemControlPageTextBaseMediumBrush}" Margin="-6,0,-6,0" />
+                    <TextBlock Text="恢复系统原生贴靠退出软件即可"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource LiquidGlassTertiaryFg}"
+                               Margin="-6,0,-6,0" />
                 </MenuItem.Header>
             </MenuItem>
             <MenuItem Header="{x:Static res:Strings.Quit}" Click="OnExitClick">
                 <MenuItem.Icon>
-                    <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE7E8;" FontSize="13" Foreground="#FF3B30" />
+                    <ui:FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE7E8;" FontSize="13" Foreground="{DynamicResource LiquidGlassDestructiveBrush}" />
                 </MenuItem.Icon>
             </MenuItem>
         </ContextMenu>

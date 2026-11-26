@@ -550,6 +550,13 @@ namespace FancyWM
 
         private void SetPreviewRectangle(Rectangle? rect, string? title = null)
         {
+            if (m_lastPreviewRect == rect && string.Equals(m_lastPreviewTitle, title, StringComparison.Ordinal))
+            {
+                return;
+            }
+            m_lastPreviewRect = rect;
+            m_lastPreviewTitle = title;
+
             if (m_dispatcher.CheckAccess())
             {
                 m_gui.PreviewTitle = title;
@@ -676,6 +683,10 @@ namespace FancyWM
                 IntPtr hwnd = window.Handle;
                 if (hwnd != IntPtr.Zero)
                 {
+                    if (s_hwndFloatingMemory.TryGetValue(hwnd, out var existing) && existing == pos)
+                    {
+                        return;
+                    }
                     SetProp(hwnd, "SS_FloatW", (IntPtr)pos.Width);
                     SetProp(hwnd, "SS_FloatH", (IntPtr)pos.Height);
                     SetProp(hwnd, "SS_FloatX", (IntPtr)pos.Left);
@@ -684,7 +695,7 @@ namespace FancyWM
                 }
 
                 string procName = "";
-                try { procName = window.GetProcess()?.ProcessName?.ToLowerInvariant() ?? ""; } catch { }
+                try { procName = window.GetCachedProcessName()?.ToLowerInvariant() ?? ""; } catch { }
                 if (!string.IsNullOrEmpty(procName))
                 {
                     s_processFloatingMemory[procName] = (pos.Width, pos.Height);
@@ -816,7 +827,7 @@ namespace FancyWM
             try
             {
                 string procName = "";
-                try { procName = window.GetProcess()?.ProcessName?.ToLowerInvariant() ?? ""; } catch { }
+                try { procName = window.GetCachedProcessName()?.ToLowerInvariant() ?? ""; } catch { }
                 if (!string.IsNullOrEmpty(procName) && s_processFloatingMemory.TryGetValue(procName, out var procSize))
                 {
                     if (IsValidFloatingDimensions(procSize.Width, procSize.Height, wa))
@@ -1162,9 +1173,17 @@ namespace FancyWM
         private void UpdateDragPreview(Point pt)
         {
             var preview = GetPreviewInfo(pt);
-            m_logger.Information("[Drag] Preview Rect={Rect}, Title={Title}", preview.Rect, preview.Title);
+            bool changed = m_lastPreviewRect != preview.Rect || !string.Equals(m_lastPreviewTitle, preview.Title, StringComparison.Ordinal);
+            if (!changed)
+            {
+                return;
+            }
+            m_logger.Debug("[Drag] Preview changed: Rect={Rect}, Title={Title}", preview.Rect, preview.Title);
             SetPreviewRectangle(preview.Rect, preview.Title);
-            m_gui.EnsureTopmost();
+            if (preview.Rect.HasValue)
+            {
+                m_gui.EnsureTopmost();
+            }
         }
 
         private Point m_lastPreviewCursor = new Point(-99999, -99999);
@@ -1652,20 +1671,12 @@ namespace FancyWM
 
         private void OnCursorLocationChanged(object? sender, CursorLocationChangedEventArgs e)
         {
-            // 鼠标未按住时绝对不触发分屏预览，并清理残留状态
+            // 鼠标未按住时仅隐藏预览阴影框，绝不提前销毁 m_movingWindow 或抹除 m_lastActiveSnapZone
+            // 防止松手瞬间鼠标微动导致 OnWindowPositionChangeEnd 丢失吸附意图
             bool isMouseButtonDown = (PInvoke.GetAsyncKeyState(1) & 0x8000) != 0 || (PInvoke.GetAsyncKeyState(2) & 0x8000) != 0;
             if (!isMouseButtonDown)
             {
-                if (m_movingWindow != null || m_currentInteraction != UserInteraction.None)
-                {
-                    m_movingWindow = null;
-                    m_currentInteraction = UserInteraction.None;
-                    m_isDraggingTitleBar = false;
-                    m_isDraggingSnappedWindow = false;
-                    m_isExternalDrag = false;
-                    StopDragTrackingTimer();
-                    SetPreviewRectangle(null, null);
-                }
+                SetPreviewRectangle(null, null);
                 return;
             }
 
@@ -2189,6 +2200,7 @@ namespace FancyWM
             m_logger.Information("Window {Window} removed from workspace", e.Source.DebugString());
 
             UnbindEventHandlers(e.Source);
+            s_hwndFloatingMemory.TryRemove(e.Source.Handle, out _);
             if (Equals(m_movingWindow, e.Source))
             {
                 m_movingWindow = null;
@@ -3303,7 +3315,7 @@ namespace FancyWM
                 container.Left + wdiff / 2,
                 container.Top + hdiff / 2,
                 container.Right - wdiff / 2,
-                container.Height - wdiff / 2
+                container.Bottom - hdiff / 2
             );
         }
 

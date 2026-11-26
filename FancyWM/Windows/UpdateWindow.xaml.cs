@@ -2,12 +2,13 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
-using System.Net.Http;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+
 using FancyWM.Utilities;
 using Microsoft.Extensions.DependencyInjection;
 using Windows.System;
@@ -15,19 +16,20 @@ using Windows.System;
 namespace FancyWM.Windows
 {
     /// <summary>
-    /// Interaction logic for UpdateWindow.xaml (macOS Aesthetic Update Window)
+    /// Interaction logic for UpdateWindow.xaml (macOS 26 Liquid Glass Software Update Sheet)
     /// </summary>
     public partial class UpdateWindow : Window
     {
         private static UpdateWindow? s_currentInstance;
 
         private readonly ReleaseChecker m_releaseChecker;
+        private readonly Version m_currentVersion;
+        private readonly ReleaseInfo? m_preloadedRelease;
         private CancellationTokenSource? m_downloadCts;
         private ReleaseInfo? m_latestRelease;
-        private Version m_currentVersion;
         private string? m_extractedSourceDir;
 
-        public static void ShowUpdateDialog(Window? owner = null)
+        public static void ShowUpdateDialog(Window? owner = null, ReleaseInfo? preloadedRelease = null)
         {
             if (s_currentInstance != null && s_currentInstance.IsLoaded)
             {
@@ -35,63 +37,69 @@ namespace FancyWM.Windows
                 {
                     s_currentInstance.WindowState = WindowState.Normal;
                 }
+                if (preloadedRelease != null && s_currentInstance.m_latestRelease == null)
+                {
+                    s_currentInstance.ApplyReleaseInfo(preloadedRelease);
+                }
                 s_currentInstance.Activate();
                 s_currentInstance.Focus();
                 return;
             }
 
-            var window = new UpdateWindow();
+            var window = new UpdateWindow(preloadedRelease);
             if (owner != null && owner.IsLoaded && owner.IsVisible)
             {
                 window.Owner = owner;
             }
             s_currentInstance = window;
-            window.Closed += (s, e) => s_currentInstance = null;
+            window.Closed += (_, _) => s_currentInstance = null;
             window.Show();
         }
 
-        public UpdateWindow()
+        public UpdateWindow(ReleaseInfo? preloadedRelease = null)
         {
             InitializeComponent();
+            m_preloadedRelease = preloadedRelease;
 
             if (Application.Current is App app)
             {
                 m_releaseChecker = app.Services?.GetService<ReleaseChecker>() ?? new ReleaseChecker();
-                var currentVerString = app.VersionString;
-                if (Version.TryParse(currentVerString, out var parsed))
-                {
-                    m_currentVersion = new Version(parsed.Major, parsed.Minor, Math.Max(0, parsed.Build));
-                }
-                else
-                {
-                    m_currentVersion = new Version(1, 0, 0);
-                }
+                m_currentVersion = App.NormalizedVersion;
             }
             else
             {
                 m_releaseChecker = new ReleaseChecker();
-                m_currentVersion = new Version(1, 0, 0);
+                m_currentVersion = new Version(1, 0, 35);
             }
 
-            try
-            {
-                var icon = FancyWM.Resources.Files.Icon;
-                if (icon != null)
-                {
-                    AppHeroIcon.Source = System.Windows.Interop.Imaging.CreateBitmapSourceFromHIcon(
-                        icon.Handle,
-                        Int32Rect.Empty,
-                        System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
-                }
-            }
-            catch { }
-
+            AppHeroIcon.Source = LiquidGlassTheme.GetAppIconImage();
             Loaded += OnWindowLoaded;
         }
 
         private async void OnWindowLoaded(object sender, RoutedEventArgs e)
         {
+            LiquidGlassTheme.PlayEntranceAnimation(SheetContainer, SheetTranslate, liftPixels: 12, durationMs: 220);
+
+            if (m_preloadedRelease != null)
+            {
+                ApplyReleaseInfo(m_preloadedRelease);
+                return;
+            }
+
             await CheckForUpdatesAsync();
+        }
+
+        private void ApplyReleaseInfo(ReleaseInfo info)
+        {
+            m_latestRelease = info;
+            if (info.Version != null && info.Version > m_currentVersion)
+            {
+                SetStateUpdateAvailable(info);
+            }
+            else
+            {
+                SetStateUpToDate(info);
+            }
         }
 
         private async Task CheckForUpdatesAsync()
@@ -100,25 +108,15 @@ namespace FancyWM.Windows
 
             try
             {
-                m_latestRelease = await m_releaseChecker.GetLatestReleaseInfoAsync("Crucialmer", "ScreenSplit");
+                var release = await m_releaseChecker.GetLatestReleaseInfoAsync("Crucialmer", "ScreenSplit");
 
-                if (m_latestRelease == null || m_latestRelease.Version == null)
+                if (release == null || release.Version == null)
                 {
                     SetStateError("未能从更新服务器解析到有效的版本信息。");
                     return;
                 }
 
-                var latest = m_latestRelease.Version;
-                var current = m_currentVersion;
-
-                if (latest > current)
-                {
-                    SetStateUpdateAvailable(m_latestRelease);
-                }
-                else
-                {
-                    SetStateUpToDate(m_latestRelease);
-                }
+                ApplyReleaseInfo(release);
             }
             catch (Exception ex)
             {
@@ -140,9 +138,16 @@ namespace FancyWM.Windows
 
         private void SetBadge(string text, Color color)
         {
-            StatusBadge.Background = new SolidColorBrush(Color.FromArgb(30, color.R, color.G, color.B));
-            StatusBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(70, color.R, color.G, color.B));
-            StatusBadgeText.Foreground = new SolidColorBrush(color);
+            var bg = new SolidColorBrush(Color.FromArgb(34, color.R, color.G, color.B));
+            var border = new SolidColorBrush(Color.FromArgb(76, color.R, color.G, color.B));
+            var fg = new SolidColorBrush(color);
+            bg.Freeze();
+            border.Freeze();
+            fg.Freeze();
+
+            StatusBadge.Background = bg;
+            StatusBadge.BorderBrush = border;
+            StatusBadgeText.Foreground = fg;
             StatusBadgeText.Text = text;
         }
 
@@ -150,7 +155,7 @@ namespace FancyWM.Windows
         {
             HideAllViews();
             CheckingView.Visibility = Visibility.Visible;
-            SetBadge("检查中", Color.FromRgb(0, 122, 255));
+            SetBadge("检查中", Color.FromRgb(10, 132, 255));
             CheckingSubtext.Text = $"正在比对本地版本 (v{m_currentVersion}) 与 GitHub Release 发行通道";
         }
 
@@ -158,7 +163,7 @@ namespace FancyWM.Windows
         {
             HideAllViews();
             UpToDateView.Visibility = Visibility.Visible;
-            SetBadge($"v{m_currentVersion} · 最新", Color.FromRgb(16, 185, 129));
+            SetBadge($"v{m_currentVersion} · 最新", Color.FromRgb(48, 209, 88));
 
             UpToDateDescription.Text = $"ScreenSplit v{m_currentVersion} 目前已是最新状态。\n所有智能边缘吸附与 240Hz 超流畅性能均已就绪。";
             LastCheckedText.Text = $"上次检查时间: 今天 {DateTime.Now:HH:mm:ss}";
@@ -168,7 +173,7 @@ namespace FancyWM.Windows
         {
             HideAllViews();
             UpdateAvailableView.Visibility = Visibility.Visible;
-            SetBadge($"发现新版本 v{info.Version}", Color.FromRgb(0, 122, 255));
+            SetBadge($"发现新版本 v{info.Version}", Color.FromRgb(10, 132, 255));
 
             NewVersionTitle.Text = $"发现新版本 ScreenSplit v{info.Version}";
 
@@ -177,7 +182,7 @@ namespace FancyWM.Windows
             NewVersionMeta.Text = $"发布时间: {pubDate}  •  大小: ~{sizeMb} MB";
 
             var changelog = string.IsNullOrWhiteSpace(info.Changelog)
-                ? $"### ScreenSplit v{info.Version}\n• 性能与流畅度优化\n• 智能边缘停靠与多窗口分屏管理升级"
+                ? $"### ScreenSplit v{info.Version}\n• macOS 26 Liquid Glass 设计美学与性能全面升级\n• 智能边缘停靠与多窗口分屏管理优化"
                 : info.Changelog;
             ReleaseNotesText.Text = changelog;
         }
@@ -186,7 +191,7 @@ namespace FancyWM.Windows
         {
             HideAllViews();
             DownloadingView.Visibility = Visibility.Visible;
-            SetBadge("正在下载", Color.FromRgb(0, 122, 255));
+            SetBadge("正在下载", Color.FromRgb(10, 132, 255));
 
             DownloadProgressBar.Value = 0;
             DownloadPercentText.Text = "0%";
@@ -197,7 +202,7 @@ namespace FancyWM.Windows
         {
             HideAllViews();
             ReadyToRestartView.Visibility = Visibility.Visible;
-            SetBadge("更新就绪", Color.FromRgb(16, 185, 129));
+            SetBadge("更新就绪", Color.FromRgb(48, 209, 88));
         }
 
         private void SetStateError(string errorMessage)
@@ -279,14 +284,12 @@ namespace FancyWM.Windows
                     progress,
                     m_downloadCts.Token);
 
-                // Extraction
                 DownloadStatusDetail.Text = "下载完成，正在解压与校验更新包...";
                 await Task.Run(() =>
                 {
                     ZipFile.ExtractToDirectory(zipPath, extractDir, true);
                 });
 
-                // Locate executable in extracted directory
                 var sourceDir = extractDir;
                 if (File.Exists(Path.Combine(extractDir, "ScreenSplit_Lite", "ScreenSplit.exe")))
                 {
@@ -294,7 +297,6 @@ namespace FancyWM.Windows
                 }
                 else if (!File.Exists(Path.Combine(extractDir, "ScreenSplit.exe")))
                 {
-                    // Search recursively
                     var files = Directory.GetFiles(extractDir, "ScreenSplit.exe", SearchOption.AllDirectories);
                     if (files.Length > 0)
                     {
@@ -346,7 +348,7 @@ namespace FancyWM.Windows
 
             try
             {
-                var targetDir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/');
+                var targetDir = AppContext.BaseDirectory.TrimEnd('\\', '/');
                 var sourceDir = m_extractedSourceDir.TrimEnd('\\', '/');
                 int currentPid = Environment.ProcessId;
 
@@ -375,7 +377,7 @@ start """" ""%TARGET_DIR%\ScreenSplit.exe""
 exit
 ";
 
-                File.WriteAllText(updaterScriptPath, scriptContent, System.Text.Encoding.Default);
+                File.WriteAllText(updaterScriptPath, scriptContent, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
 
                 var psi = new ProcessStartInfo
                 {
