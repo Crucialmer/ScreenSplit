@@ -201,6 +201,11 @@ namespace FancyWM
         private int m_externalDragFrameCount = 0;
         private TimeSpan m_lastExternalDragTime = TimeSpan.Zero;
         private readonly DispatcherTimer m_externalDragWatchdogTimer;
+        private Point m_lastLeftDownPoint;
+        private TimeSpan m_lastLeftDownTime = TimeSpan.Zero;
+        private bool m_lastLeftDownIsResizeCursor = false;
+        private bool m_isConfirmedResize = false;
+        private bool m_activeDragStartedMaximized = false;
 
         private readonly CompositeDisposable m_subscriptions = [];
         private readonly IAnimationThread m_animationThread;

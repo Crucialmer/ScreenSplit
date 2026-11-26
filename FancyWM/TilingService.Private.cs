@@ -733,6 +733,60 @@ namespace FancyWM
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool GetWindowPlacement(IntPtr hWnd, ref WINDOWPLACEMENT lpwndpl);
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct POINT_NATIVE
+        {
+            public int X;
+            public int Y;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct CURSORINFO
+        {
+            public uint cbSize;
+            public uint flags;
+            public IntPtr hCursor;
+            public POINT_NATIVE ptScreenPos;
+        }
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetCursorInfo(ref CURSORINFO pci);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr LoadCursor(IntPtr hInstance, IntPtr lpCursorName);
+
+        private static readonly Lazy<IntPtr[]> s_resizeCursors = new(() =>
+        [
+            LoadCursor(IntPtr.Zero, (IntPtr)32642), // IDC_SIZENWSE
+            LoadCursor(IntPtr.Zero, (IntPtr)32643), // IDC_SIZENESW
+            LoadCursor(IntPtr.Zero, (IntPtr)32644), // IDC_SIZEWE
+            LoadCursor(IntPtr.Zero, (IntPtr)32645), // IDC_SIZENS
+        ]);
+
+        private static bool IsResizeCursorActive()
+        {
+            try
+            {
+                var ci = new CURSORINFO { cbSize = (uint)Marshal.SizeOf<CURSORINFO>() };
+                if (GetCursorInfo(ref ci) && ci.hCursor != IntPtr.Zero)
+                {
+                    var resizeCursors = s_resizeCursors.Value;
+                    for (int i = 0; i < resizeCursors.Length; i++)
+                    {
+                        if (resizeCursors[i] != IntPtr.Zero && ci.hCursor == resizeCursors[i])
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+            }
+            return false;
+        }
+
         [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool SetProp(IntPtr hWnd, string lpString, IntPtr hData);
@@ -1423,24 +1477,130 @@ namespace FancyWM
             }
         }
 
-        private static bool IsResizeBorderClick(IntPtr hwnd, Rectangle visiblePos, Rectangle rawPos, WinMan.Point cursor, double scale)
+        private bool TryGetRecentLeftDown(out Point point, out bool wasResizeCursor)
         {
-            bool hasHitTest = TryGetNcHitTest(hwnd, cursor, out int hitTest);
-            if (hasHitTest)
+            if (m_lastLeftDownTime != TimeSpan.Zero &&
+                (m_sw.Elapsed - m_lastLeftDownTime) <= TimeSpan.FromMilliseconds(500))
             {
-                // 系统/窗口自身明确告知位于缩放边框
-                if (hitTest >= HT_LEFT && hitTest <= HT_BOTTOMRIGHT)
-                    return true;
+                point = m_lastLeftDownPoint;
+                wasResizeCursor = m_lastLeftDownIsResizeCursor;
+                return true;
+            }
+            point = default;
+            wasResizeCursor = false;
+            return false;
+        }
 
-                // 明确命中标题栏、系统菜单或标题栏按钮：绝对是拖动移动，绝不误判为缩放！
-                if (hitTest == HT_CAPTION || hitTest == HT_SYSMENU ||
-                    (hitTest >= HT_MINBUTTON && hitTest <= HT_MAXBUTTON) || hitTest == HT_CLOSE)
+        private static bool IsResizeHitTest(int hitTest) =>
+            hitTest >= HT_LEFT && hitTest <= HT_BOTTOMRIGHT;
+
+        private static bool IsCaptionHitTest(int hitTest) =>
+            hitTest == HT_CAPTION || hitTest == HT_SYSMENU ||
+            (hitTest >= HT_MINBUTTON && hitTest <= HT_MAXBUTTON) || hitTest == HT_CLOSE;
+
+        private static bool IsPointOnGeometricBorder(
+            Rectangle visiblePos,
+            Rectangle rawPos,
+            WinMan.Point pt,
+            double scale,
+            bool strictTopForClient)
+        {
+            int outerMargin = Math.Max(8, (int)Math.Round(9 * scale));
+            int innerSideMargin = Math.Max(4, (int)Math.Round(5 * scale));
+            int innerBottomMargin = Math.Max(5, (int)Math.Round(6 * scale));
+            int topOuterMargin = strictTopForClient
+                ? Math.Max(4, (int)Math.Round(5 * scale))
+                : Math.Max(4, (int)Math.Round(5 * scale));
+            int topInnerMargin = strictTopForClient
+                ? Math.Max(1, (int)Math.Round(2 * scale))
+                : Math.Max(3, (int)Math.Round(4 * scale));
+
+            bool isTopBorder = (pt.Y >= visiblePos.Top - topOuterMargin && pt.Y <= visiblePos.Top + topInnerMargin &&
+                                pt.X >= visiblePos.Left - outerMargin && pt.X <= visiblePos.Right + outerMargin) ||
+                               (pt.Y >= rawPos.Top - topOuterMargin && pt.Y <= rawPos.Top + topInnerMargin &&
+                                pt.X >= rawPos.Left - outerMargin && pt.X <= rawPos.Right + outerMargin);
+            if (isTopBorder)
+                return true;
+
+            bool isBottomBorder = (pt.Y >= visiblePos.Bottom - innerBottomMargin && pt.Y <= visiblePos.Bottom + outerMargin &&
+                                   pt.X >= visiblePos.Left - outerMargin && pt.X <= visiblePos.Right + outerMargin) ||
+                                  (pt.Y >= rawPos.Bottom - innerBottomMargin && pt.Y <= rawPos.Bottom + outerMargin &&
+                                   pt.X >= rawPos.Left - outerMargin && pt.X <= rawPos.Right + outerMargin);
+            if (isBottomBorder)
+                return true;
+
+            bool isLeftBorder = (pt.X >= visiblePos.Left - outerMargin && pt.X <= visiblePos.Left + innerSideMargin &&
+                                 pt.Y >= visiblePos.Top - outerMargin && pt.Y <= visiblePos.Bottom + outerMargin) ||
+                                (pt.X >= rawPos.Left - innerSideMargin && pt.X <= rawPos.Left + innerSideMargin &&
+                                 pt.Y >= rawPos.Top - outerMargin && pt.Y <= rawPos.Bottom + outerMargin);
+            if (isLeftBorder)
+                return true;
+
+            bool isRightBorder = (pt.X >= visiblePos.Right - innerSideMargin && pt.X <= visiblePos.Right + outerMargin &&
+                                  pt.Y >= visiblePos.Top - outerMargin && pt.Y <= visiblePos.Bottom + outerMargin) ||
+                                 (pt.X >= rawPos.Right - innerSideMargin && pt.X <= rawPos.Right + innerSideMargin &&
+                                  pt.Y >= rawPos.Top - outerMargin && pt.Y <= rawPos.Bottom + outerMargin);
+            return isRightBorder;
+        }
+
+        private static bool IsResizeBorderClick(
+            IntPtr hwnd,
+            Rectangle visiblePos,
+            Rectangle rawPos,
+            WinMan.Point cursor,
+            Point? mouseDownPoint,
+            bool mouseDownWasResizeCursor,
+            double scale,
+            out bool isConfirmedResize)
+        {
+            if (mouseDownWasResizeCursor || IsResizeCursorActive())
+            {
+                isConfirmedResize = true;
+                return true;
+            }
+
+            bool hasDownHitTest = false;
+            int downHitTest = 0;
+            if (mouseDownPoint.HasValue)
+            {
+                hasDownHitTest = TryGetNcHitTest(hwnd, mouseDownPoint.Value, out downHitTest);
+                if (hasDownHitTest)
+                {
+                    if (IsResizeHitTest(downHitTest))
+                    {
+                        isConfirmedResize = true;
+                        return true;
+                    }
+                    if (IsCaptionHitTest(downHitTest))
+                    {
+                        isConfirmedResize = false;
+                        return false;
+                    }
+                }
+            }
+
+            bool hasCursorHitTest = TryGetNcHitTest(hwnd, cursor, out int cursorHitTest);
+            if (hasCursorHitTest)
+            {
+                if (IsResizeHitTest(cursorHitTest))
+                {
+                    isConfirmedResize = true;
+                    return true;
+                }
+                if (!hasDownHitTest && IsCaptionHitTest(cursorHitTest))
+                {
+                    isConfirmedResize = false;
                     return false;
+                }
             }
 
             if (visiblePos.Width <= 0 || visiblePos.Height <= 0)
             {
-                if (rawPos.Width <= 0 || rawPos.Height <= 0) return false;
+                if (rawPos.Width <= 0 || rawPos.Height <= 0)
+                {
+                    isConfirmedResize = false;
+                    return false;
+                }
                 visiblePos = rawPos;
             }
             if (rawPos.Width <= 0 || rawPos.Height <= 0)
@@ -1448,44 +1608,112 @@ namespace FancyWM
                 rawPos = visiblePos;
             }
 
-            // 当自绘标题栏返回 HTCLIENT 时，极窄顶部（如标签栏顶部）仍可能是拖动区；
-            // 此时不主动在起点用宽顶边阈值拦截，而是交给后续实时尺寸形变检测精确判定真实缩放。
-            bool allowTopHeuristic = !hasHitTest || hitTest != HT_CLIENT;
-            int topMargin = Math.Max(2, (int)Math.Round(3 * scale));
-            int sideMargin = Math.Max(4, (int)Math.Round(5 * scale));
-            int bottomMargin = Math.Max(5, (int)Math.Round(6 * scale));
+            int effectiveHitTest = hasDownHitTest ? downHitTest : cursorHitTest;
+            bool hasEffectiveHitTest = hasDownHitTest || hasCursorHitTest;
+            bool strictTopForClient = hasEffectiveHitTest && effectiveHitTest == HT_CLIENT;
 
-            if (allowTopHeuristic)
+            isConfirmedResize = false;
+            if (mouseDownPoint.HasValue &&
+                IsPointOnGeometricBorder(visiblePos, rawPos, mouseDownPoint.Value, scale, strictTopForClient))
             {
-                bool isTopBorder = (cursor.Y >= visiblePos.Top - topMargin && cursor.Y <= visiblePos.Top + topMargin &&
-                                    cursor.X >= visiblePos.Left - 8 && cursor.X <= visiblePos.Right + 8) ||
-                                   (Math.Abs(cursor.Y - rawPos.Top) <= topMargin &&
-                                    cursor.X >= rawPos.Left - 8 && cursor.X <= rawPos.Right + 8);
-                if (isTopBorder)
-                    return true;
+                return true;
+            }
+            return IsPointOnGeometricBorder(visiblePos, rawPos, cursor, scale, strictTopForClient);
+        }
+
+        private static bool HasResizeDeformation(Rectangle rawStartRect, Rectangle curRawRect, int sizeTol)
+        {
+            if (rawStartRect.Width <= 0 || rawStartRect.Height <= 0 ||
+                curRawRect.Width <= 0 || curRawRect.Height <= 0)
+            {
+                return false;
             }
 
-            bool isBottomBorder = (cursor.Y >= visiblePos.Bottom - bottomMargin && cursor.Y <= visiblePos.Bottom + bottomMargin + 6 &&
-                                   cursor.X >= visiblePos.Left - 8 && cursor.X <= visiblePos.Right + 8) ||
-                                  Math.Abs(cursor.Y - rawPos.Bottom) <= bottomMargin;
-            if (isBottomBorder)
+            int dW = Math.Abs(curRawRect.Width - rawStartRect.Width);
+            int dH = Math.Abs(curRawRect.Height - rawStartRect.Height);
+            if (dW > sizeTol || dH > sizeTol)
+            {
                 return true;
+            }
 
-            bool isLeftBorder = (cursor.X >= visiblePos.Left - sideMargin - 3 && cursor.X <= visiblePos.Left + sideMargin &&
-                                 cursor.Y >= visiblePos.Top - 8 && cursor.Y <= visiblePos.Bottom + 8) ||
-                                (Math.Abs(cursor.X - rawPos.Left) <= sideMargin &&
-                                 cursor.Y >= rawPos.Top - 8 && cursor.Y <= rawPos.Bottom + 8);
-            if (isLeftBorder)
+            // 单边锚定形变快检：即使在松手/拉伸初期变化量仅 >= 2px（尚未达到 DPI 抖动容差），
+            // 只要有一侧边缘保持不动而对侧边缘伸长或缩短，即可 100% 确认为边框拉伸而非标题栏移动！
+            bool horizAnchoredResize = dW >= 2 &&
+                (Math.Abs(curRawRect.Left - rawStartRect.Left) <= 1 ||
+                 Math.Abs(curRawRect.Right - rawStartRect.Right) <= 1);
+            bool vertAnchoredResize = dH >= 2 &&
+                (Math.Abs(curRawRect.Top - rawStartRect.Top) <= 1 ||
+                 Math.Abs(curRawRect.Bottom - rawStartRect.Bottom) <= 1);
+            return horizAnchoredResize || vertAnchoredResize;
+        }
+
+        private static bool IsSingleEdgeAnchoredTransition(Rectangle oldRect, Rectangle newRect)
+        {
+            int dW = Math.Abs(newRect.Width - oldRect.Width);
+            int dH = Math.Abs(newRect.Height - oldRect.Height);
+            bool horiz = dW >= 2 &&
+                (Math.Abs(newRect.Left - oldRect.Left) <= 1 ||
+                 Math.Abs(newRect.Right - oldRect.Right) <= 1);
+            bool vert = dH >= 2 &&
+                (Math.Abs(newRect.Top - oldRect.Top) <= 1 ||
+                 Math.Abs(newRect.Bottom - oldRect.Bottom) <= 1);
+            return horiz || vert;
+        }
+
+        private bool IsExpectedUnsnapRestoreSize(IWindow window, Rectangle curRawRect, int sizeTol)
+        {
+            if (!m_isExternalDrag || !m_isDraggingSnappedWindow ||
+                m_currentDragTargetSize.X <= 0 || m_currentDragTargetSize.Y <= 0)
+            {
+                return false;
+            }
+
+            var vis = GetVisibleWindowRectangle(window);
+            if (vis.Width > 0 && vis.Height > 0 &&
+                Math.Abs(vis.Width - m_currentDragTargetSize.X) <= sizeTol &&
+                Math.Abs(vis.Height - m_currentDragTargetSize.Y) <= sizeTol)
+            {
                 return true;
+            }
 
-            bool isRightBorder = (cursor.X >= visiblePos.Right - sideMargin && cursor.X <= visiblePos.Right + sideMargin + 4 &&
-                                  cursor.Y >= visiblePos.Top - 8 && cursor.Y <= visiblePos.Bottom + 8) ||
-                                 (Math.Abs(cursor.X - rawPos.Right) <= sideMargin &&
-                                  cursor.Y >= rawPos.Top - 8 && cursor.Y <= rawPos.Bottom + 8);
-            if (isRightBorder)
-                return true;
+            return curRawRect.Width > 0 && curRawRect.Height > 0 &&
+                Math.Abs(curRawRect.Width - m_currentDragTargetSize.X) <= sizeTol + 24 &&
+                Math.Abs(curRawRect.Height - m_currentDragTargetSize.Y) <= sizeTol + 24;
+        }
 
-            return false;
+        private void SwitchActiveDragToResizing(IWindow? window, string reason)
+        {
+            m_currentInteraction = UserInteraction.Resizing;
+            m_isConfirmedResize = true;
+            m_isDraggingTitleBar = false;
+            m_isDraggingSnappedWindow = false;
+            m_isExternalDrag = false;
+            m_potentialExternalDragWindow = null;
+            m_potentialExternalDragInitialPos = default;
+            m_externalDragFrameCount = 0;
+            m_lastActiveSnapZone = ScreenSnapZone.None;
+            m_lastActiveSnapTime = TimeSpan.Zero;
+            StopExternalDragWatchdog();
+            StopDragTrackingTimer();
+            m_lastPreviewCursor = new Point(-99999, -99999);
+            SetPreviewRectangle(null, null);
+
+            if (window != null)
+            {
+                using (m_preSnapRectanglesLock.EnterScope())
+                {
+                    m_preSnapRectangles.Remove(window);
+                    m_activeDragOriginalRect.Remove(window);
+                }
+                using (m_snappedWindowsLock.EnterScope())
+                {
+                    m_snappedWindows.Remove(window);
+                }
+                s_snappedHwnds.TryRemove(window.Handle, out _);
+                s_hwndPreSnapMemory.TryRemove(window.Handle, out _);
+                m_logger.Information("[Drag] Window {Window} switched to RESIZING ({Reason}), split screen disabled",
+                    window.DebugString(), reason);
+            }
         }
 
         private static bool IsHalfZone(ScreenSnapZone zone) =>
@@ -1624,8 +1852,16 @@ namespace FancyWM
                 return;
             }
 
-            // 实时物理尺寸形变防御：基于真实 GetWindowRect 检测尺寸形变，避免 Win32Window 缓存延迟与瞬态抖动误杀正常分屏拖动
-            if (!m_isDraggingSnappedWindow && !m_isExternalDrag && !s_snappedHwnds.ContainsKey(m_movingWindow.Handle))
+            // 实时物理尺寸形变 / 光标缩放态防御：
+            // 无论窗口处于自由浮动、已贴靠状态（原生调整边框）或外部拖拽（未预期形变），
+            // 只要在拖拽期间出现边框缩放光标或物理尺寸超出预期形变（非最大化还原 / 非外部预期的贴靠还原），立即锁定为 RESIZING 并熄灭分屏预览！
+            if (IsResizeCursorActive())
+            {
+                SwitchActiveDragToResizing(m_movingWindow, "ResizeCursor in timer");
+                return;
+            }
+
+            if (!m_activeDragStartedMaximized)
             {
                 Rectangle initialRaw;
                 using (m_preSnapRectanglesLock.EnterScope())
@@ -1636,13 +1872,12 @@ namespace FancyWM
                 {
                     var curPos = GetRawWindowRectangle(m_movingWindow);
                     int tol = GetResizeJitterTolerance();
-                    if (Math.Abs(curPos.Width - initialRaw.Width) > tol || Math.Abs(curPos.Height - initialRaw.Height) > tol)
+                    if (!IsExpectedUnsnapRestoreSize(m_movingWindow, curPos, tol) &&
+                        HasResizeDeformation(initialRaw, curPos, tol))
                     {
-                        m_currentInteraction = UserInteraction.Resizing;
-                        m_isDraggingTitleBar = false;
-                        StopDragTrackingTimer();
-                        m_lastPreviewCursor = new Point(-99999, -99999);
-                        SetPreviewRectangle(null, null);
+                        SwitchActiveDragToResizing(
+                            m_movingWindow,
+                            $"Timer SizeDeformation dW={Math.Abs(curPos.Width - initialRaw.Width)}, dH={Math.Abs(curPos.Height - initialRaw.Height)}");
                         return;
                     }
                 }
@@ -1702,6 +1937,13 @@ namespace FancyWM
 
         private void OnExternalDragMouseButtonStateChanged(object? sender, ref LowLevelMouseHook.ButtonStateChangedEventArgs e)
         {
+            if (e.Button == LowLevelMouseHook.MouseButton.Left && e.IsPressed)
+            {
+                m_lastLeftDownPoint = new Point(e.X, e.Y);
+                m_lastLeftDownTime = m_sw.Elapsed;
+                m_lastLeftDownIsResizeCursor = IsResizeCursorActive();
+            }
+
             if (m_isExternalDrag && m_movingWindow != null)
             {
                 // 用户松开左键时（或者右键取消时）触发放下与贴靠
@@ -1734,6 +1976,18 @@ namespace FancyWM
             m_potentialExternalDragWindow = null;
             m_potentialExternalDragInitialPos = default;
             m_externalDragFrameCount = 0;
+
+            var startRaw = GetRawWindowRectangle(window);
+            if (startRaw.Width <= 0 || startRaw.Height <= 0)
+            {
+                startRaw = rawPos;
+            }
+            using (m_preSnapRectanglesLock.EnterScope())
+            {
+                m_activeDragInitialRawRect[window] = startRaw;
+            }
+            m_isConfirmedResize = false;
+            m_activeDragStartedMaximized = window.State == WindowState.Maximized || IsZoomed(window.Handle);
 
             var pos = GetVisibleWindowRectangle(window);
             if (pos.Width <= 0 || pos.Height <= 0)
@@ -1888,8 +2142,15 @@ namespace FancyWM
             finally
             {
                 m_currentInteraction = UserInteraction.None;
+                m_isConfirmedResize = false;
+                m_activeDragStartedMaximized = false;
                 m_isDraggingTitleBar = false;
                 m_isDraggingSnappedWindow = false;
+                using (m_preSnapRectanglesLock.EnterScope())
+                {
+                    m_activeDragOriginalRect.Remove(win);
+                    m_activeDragInitialRawRect.Remove(win);
+                }
                 ScheduleIgnoreRepositionRemoval(win, 45);
             }
         }
@@ -2939,8 +3200,12 @@ namespace FancyWM
             m_movingWindow = null;
             bool wasDraggingSnapped = m_isDraggingSnappedWindow;
             bool wasDraggingTitleBar = m_isDraggingTitleBar;
+            bool wasConfirmedResize = m_isConfirmedResize;
+            bool startedMaximized = m_activeDragStartedMaximized;
             var interaction = m_currentInteraction;
             m_currentInteraction = UserInteraction.None;
+            m_isConfirmedResize = false;
+            m_activeDragStartedMaximized = false;
             m_isDraggingTitleBar = false;
             m_isDraggingSnappedWindow = false;
 
@@ -2950,17 +3215,39 @@ namespace FancyWM
                 m_activeDragInitialRawRect.TryGetValue(e.Source, out initialRaw);
             }
 
-            if (win != null && interaction == UserInteraction.Resizing)
+            if (win != null && interaction == UserInteraction.Resizing && !wasConfirmedResize)
             {
                 var finalRaw = GetRawWindowRectangle(win);
                 int tol = GetResizeJitterTolerance();
                 bool sizeUnchanged = initialRaw.Width > 0 && initialRaw.Height > 0 &&
                                      Math.Abs(finalRaw.Width - initialRaw.Width) <= tol &&
-                                     Math.Abs(finalRaw.Height - initialRaw.Height) <= tol;
+                                     Math.Abs(finalRaw.Height - initialRaw.Height) <= tol &&
+                                     !HasResizeDeformation(initialRaw, finalRaw, tol);
                 if (sizeUnchanged)
                 {
-                    // 尺寸实际上并未改变：属于误判为缩放的常规移动，交还 DoWindowMove 完成拖出还原或边缘吸附
+                    // 仅在“未通过光标/HitTest/尺寸形变确认过缩放”的场景下，若整次拖动尺寸未变才交还移动流程
                     interaction = UserInteraction.Moving;
+                }
+            }
+            else if (win != null && interaction == UserInteraction.Moving)
+            {
+                if (IsResizeCursorActive())
+                {
+                    interaction = UserInteraction.Resizing;
+                    m_lastActiveSnapZone = ScreenSnapZone.None;
+                    m_lastActiveSnapTime = TimeSpan.Zero;
+                }
+                else if (!startedMaximized && initialRaw.Width > 0 && initialRaw.Height > 0)
+                {
+                    var finalRaw = GetRawWindowRectangle(win);
+                    int tol = GetResizeJitterTolerance();
+                    if (HasResizeDeformation(initialRaw, finalRaw, tol))
+                    {
+                        // 极短帧快拉兜底：即便松手太快未及收到中间帧，终态单边锚定形变依然 100% 拦截误分屏
+                        interaction = UserInteraction.Resizing;
+                        m_lastActiveSnapZone = ScreenSnapZone.None;
+                        m_lastActiveSnapTime = TimeSpan.Zero;
+                    }
                 }
             }
 
@@ -3050,15 +3337,18 @@ namespace FancyWM
                     }
 
                     // Check if this could be an external drag (e.g. Quicker / SetWindowPos mover)
-                    // 仅当用户正在物理按住鼠标左键的状态下，才进行外部拖动检测与触发
+                    // 仅当用户正在物理按住鼠标左键，且光标与命中区域均不属于边框缩放时，才进行外部拖动检测与触发
                     bool isLeftButtonDown = (PInvoke.GetAsyncKeyState(1) & 0x8000) != 0;
-                    if (m_currentInteraction == UserInteraction.None && m_movingWindow == null && isLeftButtonDown)
+                    bool hasRecentDown = TryGetRecentLeftDown(out var recentDownPt, out bool recentDownWasResize);
+                    bool activeResizeCursor = recentDownWasResize || IsResizeCursorActive();
+                    if (m_currentInteraction == UserInteraction.None && m_movingWindow == null && isLeftButtonDown && !activeResizeCursor)
                     {
                         var cursor = m_workspace.CursorLocation;
                         if (IsPointOwnedByThisDisplay(cursor, out _))
                         {
-                            bool isSizePreservedExternal = Math.Abs(e.OldPosition.Width - e.NewPosition.Width) <= 16 &&
-                                                           Math.Abs(e.OldPosition.Height - e.NewPosition.Height) <= 16;
+                            bool isSizePreservedExternal = Math.Abs(e.OldPosition.Width - e.NewPosition.Width) <= 4 &&
+                                                           Math.Abs(e.OldPosition.Height - e.NewPosition.Height) <= 4 &&
+                                                           !IsSingleEdgeAnchoredTransition(e.OldPosition, e.NewPosition);
                             int winDx = e.NewPosition.Left - e.OldPosition.Left;
                             int winDy = e.NewPosition.Top - e.OldPosition.Top;
                             bool isPositionChanged = (winDx != 0 || winDy != 0);
@@ -3073,14 +3363,47 @@ namespace FancyWM
                             {
                                 if (Equals(m_potentialExternalDragWindow, e.Source) && (m_sw.Elapsed - m_lastExternalDragTime) <= TimeSpan.FromMilliseconds(250))
                                 {
-                                    m_externalDragFrameCount++;
-                                    m_lastExternalDragTime = m_sw.Elapsed;
-
-                                    if (m_externalDragFrameCount >= 2)
+                                    bool matchesInitialSize = m_potentialExternalDragInitialPos.Width <= 0 ||
+                                        (Math.Abs(e.NewPosition.Width - m_potentialExternalDragInitialPos.Width) <= 4 &&
+                                         Math.Abs(e.NewPosition.Height - m_potentialExternalDragInitialPos.Height) <= 4 &&
+                                         !IsSingleEdgeAnchoredTransition(m_potentialExternalDragInitialPos, e.NewPosition));
+                                    if (!matchesInitialSize)
                                     {
-                                        // Confirmed external drag!
-                                        StartExternalDrag(e.Source, e.NewPosition, m_potentialExternalDragInitialPos, cursor);
-                                        return;
+                                        m_potentialExternalDragWindow = null;
+                                        m_potentialExternalDragInitialPos = default;
+                                        m_externalDragFrameCount = 0;
+                                    }
+                                    else
+                                    {
+                                        m_externalDragFrameCount++;
+                                        m_lastExternalDragTime = m_sw.Elapsed;
+
+                                        if (m_externalDragFrameCount >= 2)
+                                        {
+                                            double scale = m_display.Scaling > 0 ? m_display.Scaling : 1.0;
+                                            var curVis = GetVisibleWindowRectangle(e.Source);
+                                            var curRaw = GetRawWindowRectangle(e.Source);
+                                            if (IsResizeBorderClick(
+                                                e.Source.Handle,
+                                                curVis,
+                                                curRaw,
+                                                cursor,
+                                                hasRecentDown ? recentDownPt : null,
+                                                recentDownWasResize,
+                                                scale,
+                                                out _))
+                                            {
+                                                m_potentialExternalDragWindow = null;
+                                                m_potentialExternalDragInitialPos = default;
+                                                m_externalDragFrameCount = 0;
+                                            }
+                                            else
+                                            {
+                                                // Confirmed external drag!
+                                                StartExternalDrag(e.Source, e.NewPosition, m_potentialExternalDragInitialPos, cursor);
+                                                return;
+                                            }
+                                        }
                                     }
                                 }
                                 else
@@ -3091,9 +3414,15 @@ namespace FancyWM
                                     m_lastExternalDragTime = m_sw.Elapsed;
                                 }
                             }
+                            else if (Equals(m_potentialExternalDragWindow, e.Source))
+                            {
+                                m_potentialExternalDragWindow = null;
+                                m_potentialExternalDragInitialPos = default;
+                                m_externalDragFrameCount = 0;
+                            }
                         }
                     }
-                    else if (!isLeftButtonDown)
+                    else if (!isLeftButtonDown || activeResizeCursor)
                     {
                         m_potentialExternalDragWindow = null;
                         m_potentialExternalDragInitialPos = default;
@@ -3147,7 +3476,15 @@ namespace FancyWM
 
             if (m_currentInteraction == UserInteraction.Resizing)
             {
+                m_lastActiveSnapZone = ScreenSnapZone.None;
+                m_lastActiveSnapTime = TimeSpan.Zero;
                 SetPreviewRectangle(null, null);
+                return;
+            }
+
+            if (IsResizeCursorActive())
+            {
+                SwitchActiveDragToResizing(e.Source, "ResizeCursor during position change");
                 return;
             }
 
@@ -3157,33 +3494,24 @@ namespace FancyWM
                 m_activeDragInitialRawRect.TryGetValue(e.Source, out rawStartRect);
             }
 
-            int dW = rawStartRect.Width > 0 ? Math.Abs(e.NewPosition.Width - rawStartRect.Width) : 0;
-            int dH = rawStartRect.Height > 0 ? Math.Abs(e.NewPosition.Height - rawStartRect.Height) : 0;
+            var curRawPos = GetRawWindowRectangle(e.Source);
+            if (curRawPos.Width <= 0 || curRawPos.Height <= 0)
+            {
+                curRawPos = e.NewPosition;
+            }
             int sizeTol = GetResizeJitterTolerance();
 
-            // 尺寸形变判定：只要不是贴靠窗口拖拽还原、也不是外部拖动，一旦窗口尺寸发生显著形变（超过 DPI 抖动容差），确认为用户正在手动缩放边框
-            bool isSizeChanged = !m_isDraggingSnappedWindow && !m_isExternalDrag &&
-                                 !s_snappedHwnds.ContainsKey(e.Source.Handle) &&
-                                 (dW > sizeTol || dH > sizeTol);
+            // 尺寸形变判定（覆盖自由窗口 + 已贴靠窗口的边框缩放 + 外部拖拽意外形变）：
+            // 只要窗口未在拖拽起点处于最大化态，且本次形变不属于外部拖出贴靠时的预期还原尺寸，
+            // 无论超出容差还是出现 >=2px 单边锚定拉伸，均立即锁定为 Resizing 并彻底禁止边缘分屏！
+            bool isSizeChanged = !m_activeDragStartedMaximized &&
+                                 !IsExpectedUnsnapRestoreSize(e.Source, curRawPos, sizeTol) &&
+                                 HasResizeDeformation(rawStartRect, curRawPos, sizeTol);
             if (isSizeChanged)
             {
-                m_currentInteraction = UserInteraction.Resizing;
-                m_isDraggingTitleBar = false;
-                StopDragTrackingTimer();
-                m_lastPreviewCursor = new Point(-99999, -99999);
-                SetPreviewRectangle(null, null);
-                using (m_preSnapRectanglesLock.EnterScope())
-                {
-                    m_preSnapRectangles.Remove(e.Source);
-                    m_activeDragOriginalRect.Remove(e.Source);
-                    m_activeDragInitialRawRect.Remove(e.Source);
-                }
-                using (m_snappedWindowsLock.EnterScope())
-                {
-                    m_snappedWindows.Remove(e.Source);
-                }
-                m_logger.Information("Window {Window} size changed (dW={DW}, dH={DH}), switching to RESIZING mode, disabling split screen",
-                    e.Source.DebugString(), dW, dH);
+                SwitchActiveDragToResizing(
+                    e.Source,
+                    $"SizeDeformation dW={Math.Abs(curRawPos.Width - rawStartRect.Width)}, dH={Math.Abs(curRawPos.Height - rawStartRect.Height)}");
                 return;
             }
 
@@ -3470,8 +3798,11 @@ namespace FancyWM
             }
             m_movingWindow = e.Source;
             m_currentInteraction = UserInteraction.Moving;
+            m_isConfirmedResize = false;
+            m_activeDragStartedMaximized = e.Source.State == WindowState.Maximized || IsZoomed(e.Source.Handle);
 
             var cursor = m_workspace.CursorLocation;
+            bool hasRecentDown = TryGetRecentLeftDown(out var recentDownPt, out bool recentDownWasResize);
             Rectangle rawStartPos = GetRawWindowRectangle(e.Source);
             if (rawStartPos.Width <= 0 || rawStartPos.Height <= 0)
             {
@@ -3497,19 +3828,30 @@ namespace FancyWM
             }
 
             double scale = m_display.Scaling > 0 ? m_display.Scaling : 1.0;
-            bool isBorderResize = IsResizeBorderClick(e.Source.Handle, startPos, rawStartPos, cursor, scale);
+            bool isBorderResize = IsResizeBorderClick(
+                e.Source.Handle,
+                startPos,
+                rawStartPos,
+                cursor,
+                hasRecentDown ? recentDownPt : null,
+                recentDownWasResize,
+                scale,
+                out bool confirmedResize);
 
             // 严格边框缩放拦截：无论用户从顶边、底边、左边、右边或四角哪个边框调整窗口大小，
             // 均在起点立即锁定为 RESIZING 模式，彻底杜绝调整尺寸时误触发贴边分屏！
             if (isBorderResize)
             {
                 m_currentInteraction = UserInteraction.Resizing;
+                m_isConfirmedResize = confirmedResize;
                 m_isDraggingTitleBar = false;
                 m_isDraggingSnappedWindow = false;
+                m_lastActiveSnapZone = ScreenSnapZone.None;
+                m_lastActiveSnapTime = TimeSpan.Zero;
                 SetPreviewRectangle(null, null);
                 StopDragTrackingTimer();
-                m_logger.Information("[Drag] Window {Window} interaction detected as BORDER RESIZE, disabling split-screen snapping",
-                    e.Source.DebugString());
+                m_logger.Information("[Drag] Window {Window} interaction detected as BORDER RESIZE (confirmed={Confirmed}), disabling split-screen snapping",
+                    e.Source.DebugString(), confirmedResize);
                 return;
             }
 
@@ -3611,7 +3953,10 @@ namespace FancyWM
             m_currentInteraction = UserInteraction.Moving;
 
             StartDragTrackingTimer();
-            UpdateDragPreview(cursor);
+            if (inTitleBarArea)
+            {
+                UpdateDragPreview(cursor);
+            }
         }
 
         private void OnTilingNodeFocusRequested(object? sender, TilingNode e)
