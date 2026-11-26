@@ -1,5 +1,6 @@
 ﻿using System;
-using System.Windows.Input;
+
+using FancyWM.DllImports;
 
 using Serilog;
 
@@ -28,77 +29,70 @@ namespace FancyWM.Utilities
         private void OnMouseButtonStateChanged(object? sender, ref LowLevelMouseHook.ButtonStateChangedEventArgs e)
         {
             e.Handled = false;
-            if (!IsEnabled || e.Button != LowLevelMouseHook.MouseButton.Left)
+            if (e.Button != LowLevelMouseHook.MouseButton.Left)
             {
                 return;
             }
 
-            if (m_windowDragger is WindowDragger windowDragger)
+            if (m_windowDragger is WindowDragger activeDragger)
             {
-                e.Handled = true;
-                m_windowDragger = null;
-                windowDragger.End();
-                return;
-            }
-            else
-            {
-                if (!e.IsPressed || !IsMoveModifierPressed())
+                if (!e.IsPressed)
                 {
+                    e.Handled = true;
+                    m_windowDragger = null;
+                    activeDragger.End();
                     return;
                 }
+
+                // 若意外残留旧拖拽器而新的左键按下到来，先安全清理再继续，防止永久卡死
+                m_windowDragger = null;
+                activeDragger.End();
+            }
+
+            if (!IsEnabled || !e.IsPressed || !IsMoveModifierPressed())
+            {
+                return;
             }
 
             try
             {
-                var window = m_workspace.FindWindowFromPoint(new(e.X, e.Y));
+                var pt = new Point(e.X, e.Y);
+                var activateWindow = AutoFocus || IsMoveActivateModifierPressed();
+                var window = m_workspace.FindWindowFromPoint(pt);
                 if (window == null)
                 {
                     return;
                 }
 
-                m_windowDragger = new WindowDragger(window);
-                bool activateWindow = AutoFocus || IsMoveActivateModifierPressed();
+                var dragger = new WindowDragger(window);
+                m_windowDragger = dragger;
                 try
                 {
-                    m_windowDragger.Begin(activateWindow);
+                    dragger.Begin(activateWindow);
                 }
                 catch (Exception)
                 {
-                    m_windowDragger.End();
+                    dragger.End();
                     m_windowDragger = null;
+                    return;
                 }
                 e.Handled = true;
             }
             catch (Exception ex)
             {
-                m_logger.Error(ex, "Ocurred during drag mouse hook!");
+                m_logger.Error(ex, "Occurred during drag mouse hook!");
             }
         }
 
         private static bool IsMoveModifierPressed()
         {
-            static bool GetState() => Keyboard.IsKeyDown(Key.LeftAlt) || Keyboard.IsKeyDown(Key.RightAlt);
-            if (App.Current.Dispatcher.CheckAccess())
-            {
-                return GetState();
-            }
-            else
-            {
-                return App.Current.Dispatcher.Invoke(GetState, System.Windows.Threading.DispatcherPriority.Send);
-            }
+            // 在 WH_MOUSE_LL 钩子线程中直接无锁读取修饰键，严禁阻塞调用 WPF Dispatcher.Invoke 以免触发系统钩子超时被静默卸载
+            return (PInvoke.GetAsyncKeyState(0x12 /* VK_MENU / Alt */) & 0x8000) != 0;
         }
 
         private static bool IsMoveActivateModifierPressed()
         {
-            static bool GetState() => Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl);
-            if (App.Current.Dispatcher.CheckAccess())
-            {
-                return GetState();
-            }
-            else
-            {
-                return App.Current.Dispatcher.Invoke(GetState, System.Windows.Threading.DispatcherPriority.Send);
-            }
+            return (PInvoke.GetAsyncKeyState(0x11 /* VK_CONTROL */) & 0x8000) != 0;
         }
 
         public void Dispose()

@@ -826,7 +826,7 @@ namespace FancyWM
             return Math.Max(6, (int)Math.Round(6 * scale));
         }
 
-        private void ScheduleIgnoreRepositionRemoval(IWindow window, int delayMs = 80)
+        private void ScheduleIgnoreRepositionRemoval(IWindow window, int delayMs = 45)
         {
             _ = m_dispatcher.InvokeAsync(async () =>
             {
@@ -839,6 +839,33 @@ namespace FancyWM
                     }
                 }
             });
+        }
+
+        private void StartExternalDragWatchdog()
+        {
+            if (m_dispatcher.CheckAccess())
+            {
+                if (m_isExternalDrag) m_externalDragWatchdogTimer.Start();
+            }
+            else
+            {
+                _ = m_dispatcher.InvokeAsync(() =>
+                {
+                    if (m_isExternalDrag) m_externalDragWatchdogTimer.Start();
+                });
+            }
+        }
+
+        private void StopExternalDragWatchdog()
+        {
+            if (m_dispatcher.CheckAccess())
+            {
+                m_externalDragWatchdogTimer.Stop();
+            }
+            else
+            {
+                _ = m_dispatcher.InvokeAsync(() => m_externalDragWatchdogTimer.Stop());
+            }
         }
 
         private static Rectangle GetAccurateFrameMargins(IWindow window)
@@ -1303,18 +1330,17 @@ namespace FancyWM
                 RDW_INVALIDATE_FLAG | RDW_ERASE_FLAG | RDW_FRAME_FLAG | RDW_ALLCHILDREN_FLAG);
         }
 
-        private void ApplyWindowGeometryImmediate(IWindow window, Rectangle targetRect)
+        private void ApplyWindowGeometryAsyncSafe(IWindow window, Rectangle targetRect)
         {
             try
             {
                 IntPtr hwnd = window.Handle;
                 CancelPendingSnapSettle(hwnd);
-                bool isResponsive = WaitForMoveSizeExit(hwnd, 20);
-                ApplyWindowGeometryCore(window, targetRect, isResponsive);
+                ApplyWindowGeometryCore(window, targetRect, isResponsive: false);
             }
             catch (Exception ex)
             {
-                m_logger.Warning(ex, "Failed to apply immediate window geometry for {Window}", window.DebugString());
+                m_logger.Warning(ex, "Failed to apply async window geometry for {Window}", window.DebugString());
             }
         }
 
@@ -1583,6 +1609,11 @@ namespace FancyWM
             {
                 StopDragTrackingTimer();
                 m_nativeDragButtonUpTime = TimeSpan.Zero;
+                if (m_movingPanelNode == null)
+                {
+                    m_currentInteraction = UserInteraction.None;
+                    m_isExternalDrag = false;
+                }
                 return;
             }
 
@@ -1700,6 +1731,10 @@ namespace FancyWM
         private void StartExternalDrag(IWindow window, Rectangle rawPos, Rectangle rawInitialPos, Point cursor)
         {
             CancelPendingSnapSettle(window.Handle);
+            m_potentialExternalDragWindow = null;
+            m_potentialExternalDragInitialPos = default;
+            m_externalDragFrameCount = 0;
+
             var pos = GetVisibleWindowRectangle(window);
             if (pos.Width <= 0 || pos.Height <= 0)
             {
@@ -1758,15 +1793,15 @@ namespace FancyWM
 
             if (wasSnapped)
             {
-                if (!s_hwndPreSnapMemory.TryRemove(window.Handle, out var preSnapRect) || !IsValidFloatingRect(preSnapRect, wa))
+                if (!s_hwndPreSnapMemory.TryGetValue(window.Handle, out var preSnapRect) || !IsValidFloatingRect(preSnapRect, wa))
                 {
                     preSnapRect = GetBestFloatingRectangle(window, wa, pos);
+                    s_hwndPreSnapMemory[window.Handle] = preSnapRect;
                 }
-                s_snappedHwnds.TryRemove(window.Handle, out _);
                 m_currentDragTargetSize = new Point(preSnapRect.Width, preSnapRect.Height);
 
-                // 在检测到分屏窗口被外部拖拽工具从边缘拖出时，单次同步校准窗口实际边框与客户区大小，
-                // 避免双重冲突 SetWindowPos 或延迟回弹定时器导致客户区向下向右错位。
+                // 在检测到分屏窗口被外部拖拽工具从边缘拖出时，异步安全校准窗口尺寸，
+                // 避免在 ProcessingThread 阻塞第三方移动工具并保留原始尺寸记忆至松手结束。
                 int targetW = preSnapRect.Width;
                 int targetH = preSnapRect.Height;
                 int targetX = cursor.X - (int)(targetW * m_dragGrabRatioX);
@@ -1778,13 +1813,8 @@ namespace FancyWM
                 if (targetY + targetH > wa.Bottom) targetY = wa.Bottom - targetH;
 
                 var realFloatRect = Rectangle.OffsetAndSize(targetX, targetY, targetW, targetH);
-                ApplyWindowGeometryImmediate(window, realFloatRect);
+                ApplyWindowGeometryAsyncSafe(window, realFloatRect);
 
-                // 保持拖出标记与原始大小记录，供后续自由释放或重新贴靠使用
-                using (m_snappedWindowsLock.EnterScope())
-                {
-                    m_snappedWindows.Remove(window);
-                }
                 using (m_preSnapRectanglesLock.EnterScope())
                 {
                     m_preSnapRectangles[window] = preSnapRect;
@@ -1817,8 +1847,14 @@ namespace FancyWM
                 m_currentDragTargetSize = new Point(origRect.Width, origRect.Height);
             }
 
+            if ((PInvoke.GetAsyncKeyState(1) & 0x8000) == 0)
+            {
+                _ = m_dispatcher.InvokeAsync(EndExternalDrag);
+                return;
+            }
+
             StartDragTrackingTimer();
-            m_externalDragWatchdogTimer.Start();
+            StartExternalDragWatchdog();
             UpdateDragPreview(cursor);
         }
 
@@ -1834,7 +1870,7 @@ namespace FancyWM
             m_potentialExternalDragInitialPos = default;
             m_externalDragFrameCount = 0;
 
-            m_externalDragWatchdogTimer.Stop();
+            StopExternalDragWatchdog();
             StopDragTrackingTimer();
             m_lastPreviewCursor = new Point(-99999, -99999);
             SetPreviewRectangle(null, null);
@@ -1854,7 +1890,7 @@ namespace FancyWM
                 m_currentInteraction = UserInteraction.None;
                 m_isDraggingTitleBar = false;
                 m_isDraggingSnappedWindow = false;
-                ScheduleIgnoreRepositionRemoval(win, 100);
+                ScheduleIgnoreRepositionRemoval(win, 45);
             }
         }
 
@@ -2970,7 +3006,7 @@ namespace FancyWM
 
             m_logger.Information("Window {Window} move/resize ended", e.Source.DebugString());
             InvalidateLayout();
-            ScheduleIgnoreRepositionRemoval(e.Source, 80);
+            ScheduleIgnoreRepositionRemoval(e.Source, 45);
             using (m_preSnapRectanglesLock.EnterScope())
             {
                 m_activeDragOriginalRect.Remove(e.Source);
@@ -3007,6 +3043,12 @@ namespace FancyWM
             {
                 if (!m_ignoreRepositionSet.Contains(e.Source))
                 {
+                    // 防御性自愈：若已无活跃拖拽对象，绝不允许残留交互状态锁死后续外部辅助拖动检测
+                    if (m_movingWindow == null && !m_isExternalDrag && m_movingPanelNode == null && m_currentInteraction != UserInteraction.None)
+                    {
+                        m_currentInteraction = UserInteraction.None;
+                    }
+
                     // Check if this could be an external drag (e.g. Quicker / SetWindowPos mover)
                     // 仅当用户正在物理按住鼠标左键的状态下，才进行外部拖动检测与触发
                     bool isLeftButtonDown = (PInvoke.GetAsyncKeyState(1) & 0x8000) != 0;
@@ -3015,17 +3057,17 @@ namespace FancyWM
                         var cursor = m_workspace.CursorLocation;
                         if (IsPointOwnedByThisDisplay(cursor, out _))
                         {
-                            bool isSizePreservedExternal = Math.Abs(e.OldPosition.Width - e.NewPosition.Width) <= 10 &&
-                                                           Math.Abs(e.OldPosition.Height - e.NewPosition.Height) <= 10;
+                            bool isSizePreservedExternal = Math.Abs(e.OldPosition.Width - e.NewPosition.Width) <= 16 &&
+                                                           Math.Abs(e.OldPosition.Height - e.NewPosition.Height) <= 16;
                             int winDx = e.NewPosition.Left - e.OldPosition.Left;
                             int winDy = e.NewPosition.Top - e.OldPosition.Top;
                             bool isPositionChanged = (winDx != 0 || winDy != 0);
 
                             // Cursor is inside or very close to the moving window
-                            bool isCursorInsideWindow = cursor.X >= e.NewPosition.Left - 80 &&
-                                                        cursor.X <= e.NewPosition.Right + 80 &&
-                                                        cursor.Y >= e.NewPosition.Top - 80 &&
-                                                        cursor.Y <= e.NewPosition.Bottom + 80;
+                            bool isCursorInsideWindow = cursor.X >= e.NewPosition.Left - 120 &&
+                                                        cursor.X <= e.NewPosition.Right + 120 &&
+                                                        cursor.Y >= e.NewPosition.Top - 120 &&
+                                                        cursor.Y <= e.NewPosition.Bottom + 120;
 
                             if (isSizePreservedExternal && isPositionChanged && isCursorInsideWindow)
                             {
@@ -3070,6 +3112,12 @@ namespace FancyWM
                     });
                     return;
                 }
+            }
+
+            if (m_movingWindow == null || !Equals(m_movingWindow, e.Source))
+            {
+                // 拖放刚结束处于冷却窗内收到的异步 SetWindowPos 回声事件：直接忽略，绝不污染 m_currentInteraction！
+                return;
             }
 
             if (m_isExternalDrag && Equals(m_movingWindow, e.Source))
@@ -3410,6 +3458,11 @@ namespace FancyWM
                 return;
 
             CancelPendingSnapSettle(e.Source.Handle);
+            m_isExternalDrag = false;
+            m_potentialExternalDragWindow = null;
+            m_potentialExternalDragInitialPos = default;
+            m_externalDragFrameCount = 0;
+            StopExternalDragWatchdog();
 
             using (m_ignoreRepositionSetLock.EnterScope())
             {
