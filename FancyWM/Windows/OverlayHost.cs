@@ -287,6 +287,10 @@ namespace FancyWM.Windows
 
         private void OnMouseButtonStateChanged(object? sender, ref LowLevelMouseHook.ButtonStateChangedEventArgs e)
         {
+            if (e.Button != LowLevelMouseHook.MouseButton.Left)
+            {
+                return;
+            }
             DispatchUpdatePositions();
         }
 

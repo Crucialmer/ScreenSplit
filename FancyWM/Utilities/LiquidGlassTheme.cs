@@ -1,11 +1,13 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 
+using Microsoft.Win32;
 using ModernWpf;
 
 namespace FancyWM.Utilities
@@ -34,11 +36,40 @@ namespace FancyWM.Utilities
         [DllImport("dwmapi.dll")]
         private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref uint attrValue, int attrSize);
 
+        private const string PersonalizeRegistryPath = @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
+
         private static bool s_initialized;
         private static BitmapSource? s_cachedAppIcon;
+        private static bool? s_lastAppliedAppDark;
+        private static bool? s_lastAppliedTrayDark;
 
         public static bool IsDarkTheme =>
             ThemeManager.Current.ActualApplicationTheme == ApplicationTheme.Dark;
+
+        public static bool IsSystemAppsDarkTheme =>
+            ReadRegistryDarkPreference("AppsUseLightTheme", ThemeManager.Current.ActualApplicationTheme == ApplicationTheme.Dark);
+
+        public static bool IsSystemTaskbarDarkTheme =>
+            ReadRegistryDarkPreference("SystemUsesLightTheme", IsSystemAppsDarkTheme);
+
+        internal static bool ReadRegistryDarkPreference(string valueName, bool fallback)
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(PersonalizeRegistryPath, writable: false);
+                object? raw = key?.GetValue(valueName);
+                if (raw != null)
+                {
+                    return Convert.ToInt32(raw) == 0;
+                }
+            }
+            catch
+            {
+                // Ignore registry access failures and use fallback
+            }
+
+            return fallback;
+        }
 
         public static void Initialize()
         {
@@ -46,7 +77,7 @@ namespace FancyWM.Utilities
                 return;
 
             s_initialized = true;
-            ApplyResources(IsDarkTheme);
+            SyncSystemTheme();
             ThemeManager.Current.ActualApplicationThemeChanged += (_, _) =>
             {
                 if (Application.Current?.Dispatcher is { } dispatcher)
@@ -54,6 +85,28 @@ namespace FancyWM.Utilities
                     dispatcher.BeginInvoke(() => ApplyResources(IsDarkTheme));
                 }
             };
+            SystemEvents.UserPreferenceChanged += (_, e) =>
+            {
+                if (e.Category == UserPreferenceCategory.General &&
+                    Application.Current?.Dispatcher is { } dispatcher)
+                {
+                    dispatcher.BeginInvoke(SyncSystemTheme);
+                }
+            };
+        }
+
+        public static void SyncSystemTheme()
+        {
+            bool isAppsDark = IsSystemAppsDarkTheme;
+            ApplicationTheme desired = isAppsDark ? ApplicationTheme.Dark : ApplicationTheme.Light;
+            if (ThemeManager.Current.ActualApplicationTheme != desired)
+            {
+                ThemeManager.Current.ApplicationTheme = desired;
+            }
+            if (s_lastAppliedAppDark != isAppsDark)
+            {
+                ApplyResources(isAppsDark);
+            }
         }
 
         public static BitmapSource? GetAppIconImage()
@@ -99,6 +152,8 @@ namespace FancyWM.Utilities
         {
             if (Application.Current?.Resources is not ResourceDictionary res)
                 return;
+
+            s_lastAppliedAppDark = isDark;
 
             // Core Liquid Glass surfaces
             SetFrozen(res, "LiquidGlassWindowBg", CreateSolid(isDark ? Color.FromArgb(0xEE, 0x16, 0x18, 0x1E) : Color.FromArgb(0xF5, 0xF5, 0xF7, 0xFB)));
@@ -155,6 +210,7 @@ namespace FancyWM.Utilities
 
             SetFrozen(res, "LiquidGlassEmeraldBrush", CreateSolid(emerald));
             SetFrozen(res, "LiquidGlassEmeraldHoverBrush", CreateSolid(emeraldHover));
+            SetFrozen(res, "LiquidGlassStatusDotHalo", CreateRadialHalo(emerald));
             SetFrozen(res, "LiquidGlassDestructiveBrush", CreateSolid(destructive));
             SetFrozen(res, "LiquidGlassDestructiveHoverBg", CreateSolid(Color.FromArgb(isDark ? (byte)0x2A : (byte)0x18, destructive.R, destructive.G, destructive.B)));
 
@@ -181,6 +237,65 @@ namespace FancyWM.Utilities
                 isDark ? Color.FromArgb(0x78, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF),
                 Color.FromArgb(0x55, accent.R, accent.G, accent.B),
                 isDark ? Color.FromArgb(0x28, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x28, 0x00, 0x00, 0x00)));
+        }
+
+        /// <summary>
+        /// Applies the Windows taskbar/system Light or Dark theme directly to the detached tray ContextMenu
+        /// so its colors match the taskbar even in Custom color mode (e.g., Dark taskbar + Light apps)
+        /// without relying solely on WinRT UISettings change notifications.
+        /// </summary>
+        public static void ApplyTrayMenuTheme(ContextMenu menu, bool force = false)
+        {
+            ApplyTrayMenuTheme(menu, IsSystemTaskbarDarkTheme, force);
+        }
+
+        internal static void ApplyTrayMenuTheme(ContextMenu menu, bool isDark, bool force = false)
+        {
+            if (menu == null)
+                return;
+
+            ElementTheme targetTheme = isDark ? ElementTheme.Dark : ElementTheme.Light;
+            if (!force &&
+                s_lastAppliedTrayDark == isDark &&
+                menu.Resources.Contains("LiquidGlassMenuBg") &&
+                (Application.Current == null || ThemeManager.GetRequestedTheme(menu) == targetTheme))
+            {
+                return;
+            }
+
+            s_lastAppliedTrayDark = isDark;
+
+            if (Application.Current != null)
+            {
+                try
+                {
+                    ThemeManager.SetRequestedTheme(menu, targetTheme);
+                }
+                catch (NullReferenceException)
+                {
+                    // ThemeResources may be unavailable in headless tests without App.xaml.
+                }
+            }
+
+            var res = menu.Resources;
+            SetFrozen(res, "LiquidGlassMenuBg", CreateSolid(isDark ? Color.FromArgb(0xF2, 0x1E, 0x20, 0x28) : Color.FromArgb(0xF6, 0xFC, 0xFD, 0xFF)));
+            SetFrozen(res, "LiquidGlassWindowBorder", CreateLinearGradient(
+                new Point(0, 0), new Point(1, 1),
+                isDark ? Color.FromArgb(0x66, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0xEE, 0xFF, 0xFF, 0xFF),
+                isDark ? Color.FromArgb(0x22, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x22, 0x00, 0x00, 0x00),
+                isDark ? Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x1C, 0x00, 0x00, 0x00)));
+            SetFrozen(res, "LiquidGlassPrimaryFg", CreateSolid(isDark ? Color.FromArgb(0xF5, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0xEC, 0x11, 0x13, 0x18)));
+            SetFrozen(res, "LiquidGlassSecondaryFg", CreateSolid(isDark ? Color.FromArgb(0xA6, 0xEB, 0xEB, 0xF5) : Color.FromArgb(0x9C, 0x3C, 0x3C, 0x43)));
+            SetFrozen(res, "LiquidGlassTertiaryFg", CreateSolid(isDark ? Color.FromArgb(0x6E, 0xEB, 0xEB, 0xF5) : Color.FromArgb(0x6E, 0x3C, 0x3C, 0x43)));
+
+            var accent = isDark ? Color.FromRgb(0x0A, 0x84, 0xFF) : Color.FromRgb(0x00, 0x7A, 0xFF);
+            var emerald = isDark ? Color.FromRgb(0x30, 0xD1, 0x58) : Color.FromRgb(0x24, 0xC1, 0x4B);
+            var destructive = isDark ? Color.FromRgb(0xFF, 0x45, 0x3A) : Color.FromRgb(0xFF, 0x3B, 0x30);
+
+            SetFrozen(res, "LiquidGlassAccentBrush", CreateSolid(accent));
+            SetFrozen(res, "LiquidGlassEmeraldBrush", CreateSolid(emerald));
+            SetFrozen(res, "LiquidGlassStatusDotHalo", CreateRadialHalo(emerald));
+            SetFrozen(res, "LiquidGlassDestructiveBrush", CreateSolid(destructive));
         }
 
         /// <summary>
@@ -241,6 +356,21 @@ namespace FancyWM.Utilities
         private static SolidColorBrush CreateSolid(Color color)
         {
             var brush = new SolidColorBrush(color);
+            brush.Freeze();
+            return brush;
+        }
+
+        private static RadialGradientBrush CreateRadialHalo(Color color)
+        {
+            var brush = new RadialGradientBrush
+            {
+                GradientStops =
+                {
+                    new GradientStop(Color.FromArgb(0x70, color.R, color.G, color.B), 0.0),
+                    new GradientStop(Color.FromArgb(0x28, color.R, color.G, color.B), 0.55),
+                    new GradientStop(Color.FromArgb(0x00, color.R, color.G, color.B), 1.0),
+                }
+            };
             brush.Freeze();
             return brush;
         }

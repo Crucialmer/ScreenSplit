@@ -86,7 +86,8 @@ namespace FancyWM
         private bool m_showFocusDuringAction;
         private bool m_notifyVirtualDesktopServiceIncompatibility;
         private LowLevelHotkey[] m_directHks = [];
-        private DispatcherTimer m_dispatcherTimer;
+        private readonly System.Threading.Timer m_discoveryTimer;
+        private int m_discoveryRunning;
         private readonly CancellationTokenSource m_updateLoopCts = new();
 
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
@@ -295,17 +296,27 @@ namespace FancyWM
                 "ScreenSplit (分屏管理器)",
                 m_contextMenu);
             m_notifyIcon.LeftClick += OnNotifyIconLeftClick;
+            m_notifyIcon.ContextMenuOpening += OnNotifyIconContextMenuOpening;
+            m_notifyIcon.SystemThemeChanged += OnNotifyIconSystemThemeChanged;
             m_explorerHasVirtualDesktopTooltip = ExplorerFeature.HasVirtualDesktopTooltip();
+
+            Dispatcher.BeginInvoke(() =>
+            {
+                if (!IsTerminating)
+                {
+                    LiquidGlassTheme.ApplyTrayMenuTheme(m_contextMenu, force: true);
+                    m_contextMenu.ApplyTemplate();
+                }
+            }, DispatcherPriority.ApplicationIdle);
 
             m_stopwatch = new Stopwatch();
             m_stopwatch.Start();
 
-            m_dispatcherTimer = new DispatcherTimer(DispatcherPriority.Background)
-            {
-                Interval = TimeSpan.FromMilliseconds(250)
-            };
-            m_dispatcherTimer.Tick += new EventHandler(OnDispatcherTimerTick);
-            m_dispatcherTimer.Start();
+            m_discoveryTimer = new System.Threading.Timer(
+                OnDiscoveryTimerTick,
+                null,
+                TimeSpan.FromMilliseconds(500),
+                TimeSpan.FromMilliseconds(500));
 
             _ = PInvoke.SetWindowLong(new(m_hwnd), GetWindowLongPtr_nIndex.GWL_EXSTYLE,
                 (int)(WINDOWS_EX_STYLE.WS_EX_TOOLWINDOW | WINDOWS_EX_STYLE.WS_EX_TOPMOST));
@@ -383,18 +394,46 @@ namespace FancyWM
             });
         }
 
-        private void OnDispatcherTimerTick(object? sender, EventArgs e)
+        private void OnDiscoveryTimerTick(object? state)
         {
-            if (m_tiling == null)
+            if (IsTerminating || m_tiling == null || Interlocked.CompareExchange(ref m_discoveryRunning, 1, 0) != 0)
             {
                 return;
             }
 
-            bool anyDiscovered = m_tiling.DiscoverWindows();
-            if (anyDiscovered)
+            try
             {
-                m_tiling.Refresh();
+                bool anyDiscovered = m_tiling.DiscoverWindows();
+                if (anyDiscovered && !IsTerminating)
+                {
+                    m_tiling.Refresh();
+                }
             }
+            catch (ObjectDisposedException)
+            {
+            }
+            catch (InvalidOperationException)
+            {
+            }
+            catch (Exception ex)
+            {
+                m_logger.Debug(ex, "Background DiscoverWindows tick failed");
+            }
+            finally
+            {
+                Interlocked.Exchange(ref m_discoveryRunning, 0);
+            }
+        }
+
+        private void OnNotifyIconContextMenuOpening(object? sender, EventArgs e)
+        {
+            LiquidGlassTheme.ApplyTrayMenuTheme(m_contextMenu);
+        }
+
+        private void OnNotifyIconSystemThemeChanged(object? sender, EventArgs e)
+        {
+            LiquidGlassTheme.SyncSystemTheme();
+            LiquidGlassTheme.ApplyTrayMenuTheme(m_contextMenu);
         }
 
         private void OnBindingError(string? msg)
@@ -1773,8 +1812,7 @@ namespace FancyWM
                 hk.Dispose();
             }
 
-            m_dispatcherTimer.Tick -= OnDispatcherTimerTick;
-            m_dispatcherTimer?.Stop();
+            m_discoveryTimer?.Dispose();
 
             m_logger.Debug($"Stopping the tiling window manager...");
             m_tiling?.Dispose();
@@ -1783,7 +1821,12 @@ namespace FancyWM
             m_logger.Debug($"Closing all other subscriptions...");
             m_subscriptions?.Dispose();
 
-            m_notifyIcon?.Dispose();
+            if (m_notifyIcon != null)
+            {
+                m_notifyIcon.ContextMenuOpening -= OnNotifyIconContextMenuOpening;
+                m_notifyIcon.SystemThemeChanged -= OnNotifyIconSystemThemeChanged;
+                m_notifyIcon.Dispose();
+            }
         }
     }
 }

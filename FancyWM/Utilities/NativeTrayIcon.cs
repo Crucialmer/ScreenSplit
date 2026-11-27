@@ -13,11 +13,14 @@ namespace FancyWM.Utilities
     /// </summary>
     internal sealed class NativeTrayIcon : IDisposable
     {
+        private const int WM_NULL = 0x0000;
+        private const int WM_SETTINGCHANGE = 0x001A;
         private const int WM_TRAYICON = 0x8065;
         private const int WM_CONTEXTMENU = 0x007B;
         private const int WM_LBUTTONUP = 0x0202;
         private const int WM_LBUTTONDBLCLK = 0x0203;
         private const int WM_RBUTTONUP = 0x0205;
+        private const long ContextMenuDedupeMs = 120;
 
         private const uint NIM_ADD = 0x00000000;
         private const uint NIM_MODIFY = 0x00000001;
@@ -61,14 +64,23 @@ namespace FancyWM.Utilities
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
 
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool PostMessageW(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
         private readonly HwndSource m_hwndSource;
         private readonly Icon m_icon;
         private readonly uint m_taskbarCreatedMsg;
         private readonly uint m_iconId = 1;
         private string m_toolTipText;
+        private long m_lastContextMenuTickMs;
         private bool m_disposed;
 
         public event EventHandler? LeftClick;
+        public event EventHandler? ContextMenuOpening;
+        public event EventHandler? SystemThemeChanged;
+
+        internal IntPtr WindowHandle => m_hwndSource.Handle;
 
         public ContextMenu? ContextMenu { get; set; }
 
@@ -155,6 +167,12 @@ namespace FancyWM.Utilities
                 return IntPtr.Zero;
             }
 
+            if (msg == WM_SETTINGCHANGE)
+            {
+                SystemThemeChanged?.Invoke(this, EventArgs.Empty);
+                return IntPtr.Zero;
+            }
+
             if (msg == WM_TRAYICON)
             {
                 int mouseMsg = unchecked((int)lParam.ToInt64()) & 0xFFFF;
@@ -172,18 +190,34 @@ namespace FancyWM.Utilities
 
                     case WM_RBUTTONUP:
                     case WM_CONTEXTMENU:
-                        if (ContextMenu != null)
-                        {
-                            _ = SetForegroundWindow(m_hwndSource.Handle);
-                            ContextMenu.Placement = PlacementMode.MousePoint;
-                            ContextMenu.IsOpen = true;
-                        }
+                        OpenContextMenu();
                         handled = true;
                         break;
                 }
             }
 
             return IntPtr.Zero;
+        }
+
+        private void OpenContextMenu()
+        {
+            if (ContextMenu == null)
+            {
+                return;
+            }
+
+            long now = Environment.TickCount64;
+            if ((now - m_lastContextMenuTickMs) < ContextMenuDedupeMs)
+            {
+                return;
+            }
+            m_lastContextMenuTickMs = now;
+
+            ContextMenuOpening?.Invoke(this, EventArgs.Empty);
+            _ = SetForegroundWindow(m_hwndSource.Handle);
+            ContextMenu.Placement = PlacementMode.MousePoint;
+            ContextMenu.IsOpen = true;
+            _ = PostMessageW(m_hwndSource.Handle, WM_NULL, IntPtr.Zero, IntPtr.Zero);
         }
 
         public void Dispose()

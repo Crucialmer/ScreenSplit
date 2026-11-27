@@ -85,7 +85,7 @@ namespace FancyWM
             {
                 return $"{asmVer.Major}.{asmVer.Minor}.{Math.Max(0, asmVer.Build)}";
             }
-            return "1.0.41";
+            return "1.0.42";
         }
 
         private static Version ParseNormalizedVersion(string versionText)

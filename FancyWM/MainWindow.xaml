@@ -16,6 +16,7 @@
         <ContextMenu x:Key="NotifierContextMenu"
                      Placement="MousePoint"
                      StaysOpen="False"
+                     HasDropShadow="False"
                      Padding="4,6"
                      Background="{DynamicResource LiquidGlassMenuBg}"
                      BorderBrush="{DynamicResource LiquidGlassWindowBorder}"
@@ -24,11 +25,10 @@
                 <MenuItem.Header>
                     <StackPanel Orientation="Vertical" Margin="-6,3,-6,3">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <Ellipse Width="8" Height="8" Fill="{DynamicResource LiquidGlassEmeraldBrush}" Margin="0,0,8,0" VerticalAlignment="Center">
-                                <Ellipse.Effect>
-                                    <DropShadowEffect BlurRadius="6" ShadowDepth="0" Color="#30D158" Opacity="0.85" />
-                                </Ellipse.Effect>
-                            </Ellipse>
+                            <Grid Width="12" Height="12" Margin="-2,0,6,0" VerticalAlignment="Center">
+                                <Ellipse Width="12" Height="12" Fill="{DynamicResource LiquidGlassStatusDotHalo}" />
+                                <Ellipse Width="7" Height="7" Fill="{DynamicResource LiquidGlassEmeraldBrush}" />
+                            </Grid>
                             <TextBlock Text="{x:Static local:App.TrayTitleText}"
                                        FontWeight="SemiBold"
                                        FontSize="13"
