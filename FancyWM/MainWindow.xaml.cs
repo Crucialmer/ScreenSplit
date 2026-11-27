@@ -19,7 +19,6 @@ using WinMan;
 using WinMan.Windows;
 using FancyWM.Controls;
 using ModernWpf;
-using Hardcodet.Wpf.TaskbarNotification;
 using System.Reactive.Disposables;
 using System.Reactive;
 using Serilog;
@@ -68,7 +67,7 @@ namespace FancyWM
         private LowLevelHotkey[]? m_cmdHks;
         private LowLevelHotkey? m_capsLockHk;
 
-        private readonly TaskbarIcon m_notifyIcon;
+        private readonly NativeTrayIcon m_notifyIcon;
         private readonly CountdownTimer m_hideCountdownTimer;
         private readonly ContextMenu m_contextMenu;
         private readonly bool m_explorerHasVirtualDesktopTooltip;
@@ -291,19 +290,11 @@ namespace FancyWM
             m_hideCountdownTimer = new CountdownTimer();
             m_contextMenu = (ContextMenu)FindResource("NotifierContextMenu");
 
-            m_notifyIcon = new TaskbarIcon
-            {
-                Icon = appIcon ?? System.Drawing.SystemIcons.Application,
-                ToolTipText = "ScreenSplit (分屏管理器)",
-                Visibility = Visibility.Visible,
-                ContextMenu = m_contextMenu,
-                NoLeftClickDelay = true,
-            };
-            m_notifyIcon.TrayLeftMouseDown += OnNotifyIconLeftMouseDown;
-            m_notifyIcon.TrayLeftMouseUp += OnNotifyIconLeftMouseUp;
-            m_notifyIcon.TrayMouseDoubleClick += OnNotifyIconDoubleClick;
-            m_notifyIcon.LeftClickCommand = new DelegateCommand(_ => OpenSettings());
-            m_notifyIcon.DoubleClickCommand = new DelegateCommand(_ => OpenSettings());
+            m_notifyIcon = new NativeTrayIcon(
+                appIcon ?? System.Drawing.SystemIcons.Application,
+                "ScreenSplit (分屏管理器)",
+                m_contextMenu);
+            m_notifyIcon.LeftClick += OnNotifyIconLeftClick;
             m_explorerHasVirtualDesktopTooltip = ExplorerFeature.HasVirtualDesktopTooltip();
 
             m_stopwatch = new Stopwatch();
@@ -1439,19 +1430,7 @@ namespace FancyWM
             m_tiling.Split(vertical: false);
         }
 
-        private void OnNotifyIconLeftMouseDown(object? sender, RoutedEventArgs e)
-        {
-            m_contextMenu.IsOpen = false;
-            OpenSettings();
-        }
-
-        private void OnNotifyIconLeftMouseUp(object? sender, RoutedEventArgs e)
-        {
-            m_contextMenu.IsOpen = false;
-            OpenSettings();
-        }
-
-        private void OnNotifyIconDoubleClick(object? sender, RoutedEventArgs e)
+        private void OnNotifyIconLeftClick(object? sender, EventArgs e)
         {
             m_contextMenu.IsOpen = false;
             OpenSettings();

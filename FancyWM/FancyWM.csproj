@@ -15,7 +15,7 @@
     <PackageIcon>Icon.png</PackageIcon>
     <Platforms>AnyCPU;x64;x86</Platforms>
     <StartupObject>FancyWM.Startup</StartupObject>
-    <Version>1.0.40</Version>
+    <Version>1.0.41</Version>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
     <Nullable>enable</Nullable>
@@ -80,7 +80,6 @@
 
   <ItemGroup>
     <PackageReference Include="DesktopBridge.Helpers" Version="1.2.2" />
-    <PackageReference Include="Hardcodet.NotifyIcon.Wpf.NetCore" Version="1.0.18" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0" />
     <PackageReference Include="Serilog.Sinks.Debug" Version="2.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
