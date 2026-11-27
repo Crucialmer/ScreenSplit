@@ -92,7 +92,7 @@ namespace FancyWM.Windows
                 }
             }
 
-            private void UpdateRenderTransform()
+            internal void UpdateRenderTransform()
             {
                 EnsureLocation();
                 var bounds = m_display.Bounds;

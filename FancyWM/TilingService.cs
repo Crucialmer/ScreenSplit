@@ -206,6 +206,12 @@ namespace FancyWM
         private bool m_lastLeftDownIsResizeCursor = false;
         private bool m_isConfirmedResize = false;
         private bool m_activeDragStartedMaximized = false;
+        private uint m_activeDragWindowDpi = 0;
+        private readonly DispatcherTimer m_fallbackDragProbeTimer;
+        private IntPtr m_fallbackProbeHwnd = IntPtr.Zero;
+        private Rectangle m_fallbackProbeInitialRect = default;
+        private Rectangle m_fallbackProbeLastRect = default;
+        private int m_fallbackProbeMoveFrames = 0;
 
         private readonly CompositeDisposable m_subscriptions = [];
         private readonly IAnimationThread m_animationThread;
@@ -297,6 +303,10 @@ namespace FancyWM
             {
                 IsEnabled = false
             };
+            m_fallbackDragProbeTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(35), DispatcherPriority.Input, OnFallbackDragProbeTick, m_dispatcher)
+            {
+                IsEnabled = false
+            };
             if (App.Current.Services.GetService<LowLevelMouseHook>() is LowLevelMouseHook mshk)
             {
                 mshk.ButtonStateChanged += OnExternalDragMouseButtonStateChanged;
@@ -337,6 +347,7 @@ namespace FancyWM
             m_display.ScalingChanged += OnDisplayScalingChanged;
 
             m_workspace.WindowAdded += OnWindowAdded;
+            m_workspace.WindowManaging += OnWindowAdded;
             m_workspace.WindowRemoved += OnWindowRemoved;
             m_workspace.FocusedWindowChanged += OnWorkspaceFocusedWindowChanged;
 
@@ -468,8 +479,47 @@ namespace FancyWM
             InvalidateLayout();
         }
 
+        private void SyncMissingSnapshotWindows()
+        {
+            if (!m_active)
+            {
+                return;
+            }
+
+            IReadOnlyList<IWindow> snapshot;
+            try
+            {
+                snapshot = m_workspace.GetSnapshot();
+            }
+            catch
+            {
+                return;
+            }
+
+            foreach (var w in snapshot)
+            {
+                bool alreadyTracked;
+                using (m_windowSetLock.EnterScope())
+                {
+                    alreadyTracked = m_windowSet.Contains(w);
+                }
+                if (!alreadyTracked)
+                {
+                    try
+                    {
+                        OnWindowAdded(w, new WindowChangedEventArgs(w));
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+        }
+
         public bool DiscoverWindows()
         {
+            SyncMissingSnapshotWindows();
+
             if (!AutoRegisterWindows)
             {
                 return false;
@@ -690,11 +740,68 @@ namespace FancyWM
             }
         }
 
+        public void RecoverFromSystemEvent()
+        {
+            if (!m_active)
+            {
+                return;
+            }
+
+            bool isMouseDown = (DllImports.PInvoke.GetAsyncKeyState(1) & 0x8000) != 0 ||
+                               (DllImports.PInvoke.GetAsyncKeyState(2) & 0x8000) != 0;
+            if (!isMouseDown)
+            {
+                m_movingWindow = null;
+                m_currentInteraction = UserInteraction.None;
+                m_isExternalDrag = false;
+                m_potentialExternalDragWindow = null;
+                m_potentialExternalDragInitialPos = default;
+                m_externalDragFrameCount = 0;
+                m_isConfirmedResize = false;
+                m_activeDragStartedMaximized = false;
+                m_activeDragWindowDpi = 0;
+                m_isDraggingTitleBar = false;
+                m_isDraggingSnappedWindow = false;
+                m_lastLeftDownTime = TimeSpan.Zero;
+                m_lastLeftDownIsResizeCursor = false;
+                m_lastActiveSnapZone = ScreenSnapZone.None;
+                m_lastActiveSnapTime = TimeSpan.Zero;
+                m_lastPreviewCursor = new Point(-99999, -99999);
+                StopFallbackDragProbe();
+                StopExternalDragWatchdog();
+                StopDragTrackingTimer();
+                using (m_ignoreRepositionSetLock.EnterScope())
+                {
+                    m_ignoreRepositionSet.Clear();
+                }
+                using (m_preSnapRectanglesLock.EnterScope())
+                {
+                    m_activeDragOriginalRect.Clear();
+                    m_activeDragInitialRawRect.Clear();
+                }
+                SetPreviewRectangle(null, null);
+            }
+
+            SyncMissingSnapshotWindows();
+
+            _ = m_dispatcher.InvokeAsync(() =>
+            {
+                if (!m_active)
+                {
+                    return;
+                }
+                m_gui.RefreshDisplayBounds();
+                m_gui.Show();
+                m_gui.EnsureTopmost();
+            });
+        }
+
         public void Dispose()
         {
             m_logger.Information("No longer managing display {Display}", m_display);
 
             m_active = false;
+            StopFallbackDragProbe();
             StopDragTrackingTimer();
             m_externalDragWatchdogTimer.Stop();
             if (App.Current.Services.GetService<LowLevelMouseHook>() is LowLevelMouseHook mshk)
@@ -714,6 +821,7 @@ namespace FancyWM
             m_workspace.CursorLocationChanged -= OnCursorLocationChanged;
 
             m_workspace.WindowAdded -= OnWindowAdded;
+            m_workspace.WindowManaging -= OnWindowAdded;
             m_workspace.WindowRemoved -= OnWindowRemoved;
             m_workspace.FocusedWindowChanged -= OnWorkspaceFocusedWindowChanged;
 

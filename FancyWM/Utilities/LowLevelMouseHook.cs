@@ -73,10 +73,17 @@ namespace FancyWM.Utilities
                         if (DateTime.UtcNow - m_lastActiveTimestamp > RehookIdleInterval)
                         {
                             m_lastActiveTimestamp = DateTime.UtcNow;
-                            // Rehook if elapsed
-                            HHOOK oldHHook = m_hHook;
-                            m_hHook = PInvoke.SetWindowsHookEx(SetWindowsHookEx_idHook.WH_MOUSE_LL, m_hookProcDelegate, hInstance, 0);
-                            PInvoke.UnhookWindowsHookEx(oldHHook);
+                            // Rehook safely: only replace and unhook old handle if new hook succeeds
+                            HHOOK newHHook = PInvoke.SetWindowsHookEx(SetWindowsHookEx_idHook.WH_MOUSE_LL, m_hookProcDelegate, hInstance, 0);
+                            if (newHHook != IntPtr.Zero)
+                            {
+                                HHOOK oldHHook = m_hHook;
+                                m_hHook = newHHook;
+                                if (oldHHook != IntPtr.Zero)
+                                {
+                                    _ = PInvoke.UnhookWindowsHookEx(oldHHook);
+                                }
+                            }
                         }
                     }
                     else if (lpMsg.message == Constants.WM_QUIT)
@@ -97,10 +104,11 @@ namespace FancyWM.Utilities
                 PInvoke.KillTimer(new HWND(), timerId);
             }
 
-            if (!PInvoke.UnhookWindowsHookEx(m_hHook))
+            if (m_hHook != IntPtr.Zero && !PInvoke.UnhookWindowsHookEx(m_hHook))
             {
                 throw new Win32Exception("Failed to unset the global WH_KEYBOARD_LL!");
             }
+            m_hHook = default;
         }
 
         private LRESULT HookProc(int code, WPARAM wParam, LPARAM lParam)

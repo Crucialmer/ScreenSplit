@@ -331,6 +331,55 @@ namespace FancyWM
             Show();
             Hide();
             ((HwndSource)PresentationSource.FromVisual(this)).AddHook(WndProc);
+
+            Microsoft.Win32.SystemEvents.PowerModeChanged += OnSystemPowerModeChanged;
+            Microsoft.Win32.SystemEvents.SessionSwitch += OnSystemSessionSwitch;
+            Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnSystemDisplaySettingsChanged;
+        }
+
+        private void TriggerSystemRecovery(string reason)
+        {
+            m_logger.Information("[Recovery] System event triggered recovery: {Reason}", reason);
+            _ = Dispatcher.InvokeAsync(() =>
+            {
+                if (IsTerminating)
+                {
+                    return;
+                }
+                try
+                {
+                    SystemSnapManager.DisableWhileRunning();
+                    m_workspace.RefreshConfiguration();
+                    m_tiling?.RecoverFromSystemEvent();
+                }
+                catch (Exception ex)
+                {
+                    m_logger.Warning(ex, "[Recovery] Error during system event recovery ({Reason})", reason);
+                }
+            }, DispatcherPriority.Background);
+        }
+
+        private void OnSystemPowerModeChanged(object? sender, Microsoft.Win32.PowerModeChangedEventArgs e)
+        {
+            if (e.Mode == Microsoft.Win32.PowerModes.Resume)
+            {
+                TriggerSystemRecovery("PowerModes.Resume");
+            }
+        }
+
+        private void OnSystemSessionSwitch(object? sender, Microsoft.Win32.SessionSwitchEventArgs e)
+        {
+            if (e.Reason == Microsoft.Win32.SessionSwitchReason.SessionUnlock ||
+                e.Reason == Microsoft.Win32.SessionSwitchReason.ConsoleConnect ||
+                e.Reason == Microsoft.Win32.SessionSwitchReason.RemoteConnect)
+            {
+                TriggerSystemRecovery($"SessionSwitch.{e.Reason}");
+            }
+        }
+
+        private void OnSystemDisplaySettingsChanged(object? sender, EventArgs e)
+        {
+            TriggerSystemRecovery("DisplaySettingsChanged");
         }
 
         private UnmanagedResourceGuard? ApplySystemParameters()
@@ -1717,6 +1766,10 @@ namespace FancyWM
         public void Dispose()
 #pragma warning restore CA1816 // Dispose methods should call SuppressFinalize
         {
+            Microsoft.Win32.SystemEvents.PowerModeChanged -= OnSystemPowerModeChanged;
+            Microsoft.Win32.SystemEvents.SessionSwitch -= OnSystemSessionSwitch;
+            Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= OnSystemDisplaySettingsChanged;
+
             SystemSnapManager.RestoreSystemSnap();
             m_unmanagedResourceGuard?.Dispose();
 

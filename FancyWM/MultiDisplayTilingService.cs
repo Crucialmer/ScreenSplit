@@ -115,10 +115,6 @@ namespace FancyWM
             {
                 lock (m_syncRoot)
                 {
-                    if (m_activeDisplay.Equals(e.Source))
-                    {
-                        UpdateActiveDisplay($"the active display {e.Source} was removed");
-                    }
                     if (m_tilingServices.TryGetValue(e.Source, out var tiling))
                     {
                         m_tilingServices.Remove(e.Source);
@@ -126,6 +122,10 @@ namespace FancyWM
                         tiling.PendingIntentChanged -= OnPendingIntentChanged;
                         tiling.Stop();
                         tiling.Dispose();
+                    }
+                    if (m_activeDisplay.Equals(e.Source) || !m_tilingServices.ContainsKey(m_activeDisplay))
+                    {
+                        UpdateActiveDisplay($"the active display {e.Source} was removed");
                     }
                 }
 
@@ -236,7 +236,12 @@ namespace FancyWM
         {
             lock (m_syncRoot)
             {
-                return m_tilingServices[m_activeDisplay];
+                if (m_tilingServices.TryGetValue(m_activeDisplay, out var tiling))
+                {
+                    return tiling;
+                }
+                return m_tilingServices.Values.FirstOrDefault()
+                    ?? throw new InvalidOperationException("No active display tiling service is available.");
             }
         }
 
@@ -244,7 +249,12 @@ namespace FancyWM
         {
             lock (m_syncRoot)
             {
-                return m_tilingServices[Workspace.DisplayManager.PrimaryDisplay];
+                if (m_tilingServices.TryGetValue(Workspace.DisplayManager.PrimaryDisplay, out var tiling))
+                {
+                    return tiling;
+                }
+                return m_tilingServices.Values.FirstOrDefault()
+                    ?? throw new InvalidOperationException("No primary display tiling service is available.");
             }
         }
 
@@ -253,11 +263,34 @@ namespace FancyWM
             PlacementFailed?.Invoke(this, e);
         }
 
+        public void RecoverFromSystemEvent()
+        {
+            List<TilingService> services;
+            lock (m_syncRoot)
+            {
+                services = [.. m_tilingServices.Values];
+            }
+            foreach (var tiling in services)
+            {
+                tiling.RecoverFromSystemEvent();
+            }
+        }
+
         public void Dispose()
         {
             lock (m_syncRoot)
             {
+                Workspace.DisplayManager.Added -= OnDisplayAdded;
+                Workspace.DisplayManager.Removed -= OnDisplayRemoved;
                 m_subscriptions.Dispose();
+                foreach (var tiling in m_tilingServices.Values)
+                {
+                    tiling.PlacementFailed -= OnTilingFailed;
+                    tiling.PendingIntentChanged -= OnPendingIntentChanged;
+                    tiling.Stop();
+                    tiling.Dispose();
+                }
+                m_tilingServices.Clear();
             }
         }
 

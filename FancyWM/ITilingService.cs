@@ -51,6 +51,7 @@ namespace FancyWM
 
         void Stop();
         void Start();
+        void RecoverFromSystemEvent();
         IWindow? GetFocus();
         Rectangle GetBounds();
         IWindow? FindClosest(Point center);

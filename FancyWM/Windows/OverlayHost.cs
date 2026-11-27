@@ -209,6 +209,28 @@ namespace FancyWM.Windows
             PInvoke.SetWindowPos(new(m_nonHitTestableHwnd), new(new IntPtr(-1)), 0, 0, 0, 0, swpFlags);
         }
 
+        public void RefreshDisplayBounds()
+        {
+            void Apply()
+            {
+                m_nonHitTestableWindow.UpdateRenderTransform();
+                m_window.UpdateRenderTransform();
+                if (m_isShown)
+                {
+                    UpdatePositions();
+                }
+            }
+
+            if (Dispatcher.CheckAccess())
+            {
+                Apply();
+            }
+            else
+            {
+                _ = Dispatcher.InvokeAsync(Apply);
+            }
+        }
+
         public void SetResource(string key, object? value)
         {
             m_window.Resources[key] = value;

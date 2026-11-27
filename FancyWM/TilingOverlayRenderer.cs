@@ -335,6 +335,11 @@ namespace FancyWM
             m_overlay.EnsureTopmost();
         }
 
+        internal void RefreshDisplayBounds()
+        {
+            m_overlay.RefreshDisplayBounds();
+        }
+
         internal void Hide()
         {
             m_overlay.Hide();
